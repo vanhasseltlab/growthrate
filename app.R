@@ -2,7 +2,6 @@ library(shiny)
 library(lattice)
 library(deSolve)
 library("growthrates")
-#library(readr)
 
 ui <- fluidPage(
   
@@ -32,13 +31,13 @@ ui <- fluidPage(
       # doing it immediately when inputs change).
       fluidRow(
         column(3,
-               actionButton("update_1", "Run Step 1")),
+               actionButton("update_1", HTML("Step 1:<br/>Compute<br/>Growth Rates"))),
         column(3,
-               actionButton("update_2", "Run Step 2"))),
+               actionButton("update_2", HTML("Step 2:<br/>Compute<br/>PD relation ")))),
       
       helpText("Note: Restart estimation when changing input parameters. If changing step 2 methods or parameters, it is only necessary to rerun step 2."),
       
-      radioButtons(inputId = "pool", label="Pool data according to:", choices = c("None","replicates"),selected="replicates"),
+      radioButtons(inputId = "pool", label="Compute growth rate", choices = c("per replicate","pooled"),selected="pooled"),
       #helpText("Note: Step 2 is only possible when data with different drug concentrations is not pooled together!"),
 
       # Input: Selector for choosing method
@@ -183,22 +182,22 @@ ui <- fluidPage(
         
           fluidRow(
             column(3,
-                   numericInput("E0", "E0:",
+                   numericInput("E0", "Effect without drug: E0",
                                 min = -5, max = 5,
                                 value = 0.4, step = 0.1)
             ),
             column(3,
-                   numericInput("E_max", "E_max:",
+                   numericInput("E_max", "Maximum effect: E_max",
                                 min = -5, max = 5,
                                 value = -0.4, step = 0.1)
             ),
             column(3,
-                   numericInput("EC50", "EC50:",
+                   numericInput("EC50", "Drug concentration: EC50",
                                 min = -5, max = 5,
                                 value = 0.2, step = 0.1)
             ),
             column(3,
-                   numericInput("k", "Hill parameter k:",
+                   numericInput("k", "Hill parameter: k",
                                 min = -5, max = 5,
                                 value = 1, step = 0.1))
           )
@@ -217,11 +216,11 @@ ui <- fluidPage(
       # Output: Tabset
       tabsetPanel(type = "tabs",
                   tabPanel("Input Data", tableOutput("data")),
-                  tabPanel("Step 1 Plots", plotOutput("plots")),
-                  tabPanel("Step 1 Results", tableOutput("results")),
-                  tabPanel("Step 2 Plots", plotOutput("Gconc")),
-                  tabPanel("Step 2 Results", tableOutput("results_step2")),
-                  tabPanel("Step 2 Fit Summary", verbatimTextOutput("fit_step2"))
+                  tabPanel(HTML("Step 1:<br/>Growth Rates<br/>Plots"), plotOutput("plots")),
+                  tabPanel(HTML("Step 1:<br/>Growth Rates<br/>Results"), tableOutput("results")),
+                  tabPanel(HTML("Step 2:<br/>PD relation<br/>Plots"), plotOutput("Gconc")),
+                  tabPanel(HTML("Step 2:<br/>PD relation<br/>Results"), tableOutput("results_step2")),
+                  tabPanel(HTML("Step 2:<br/>PD relation<br/>Fit Summary"), verbatimTextOutput("fit_step2"))
                   )
       )
     )
@@ -291,6 +290,7 @@ getData <- reactive({
   req(input$file1)
   df <- read.csv(input$file1$datapath)
   df_subset <- subset(df, (df$strain_name==input$selected_strain) & (df$drug_name==input$selected_drug) & (df$media_name==input$selected_media))
+  df_subset$corrected_measurement <- as.numeric(as.character(df_subset$corrected_measurement))
   return(df_subset)
 })
 
@@ -306,7 +306,7 @@ getData <- reactive({
       colnames(df)[which((colnames(df)=="corrected_measurement"))] <- "selected_measurement"
     }
     
-    if (input$pool=="replicates") {
+    if (input$pool=="pooled") {
       if (input$method == "smoothing") {
         # Smooting for mutliple data sets for groups "strain_name" "drug_concentration"
         many_fits <- all_splines(selected_measurement ~ time | drug_concentration,
@@ -338,7 +338,7 @@ getData <- reactive({
       }
     }
     
-    else if (input$pool=="None"){
+    else if (input$pool=="per replicate"){
       if (input$method == "smoothing") {
         # Smooting for mutliple data sets 
         many_fits <- all_splines(selected_measurement ~ time | drug_concentration + replicate_ID,
@@ -364,39 +364,6 @@ getData <- reactive({
         
         many_fits <- all_growthmodels(
           selected_measurement ~ grow_huang(time, parms) | drug_concentration + replicate_ID,
-          data = df,
-          p = p, lower = lower, upper = upper,
-          transform = "log", ncores = 2)
-      }
-      
-    }
-    
-    else if (input$pool=="replicates & concentration"){
-      if (input$method == "smoothing") {
-        # Smooting for mutliple data sets 
-        many_fits <- all_splines(selected_measurement ~ time,
-                                 data = df, spar = 0.5)
-      }
-      
-      else if (input$method == "baranyi") {
-        p   <- c(y0 = sliderValues()$InitialEstimate[1], mumax = sliderValues()$InitialEstimate[2], K = sliderValues()$InitialEstimate[3], h0 = sliderValues()$InitialEstimate[4])
-        lower   <- c(y0 = sliderValues()$LowerEst[1], mumax = sliderValues()$LowerEst[2], K = sliderValues()$LowerEst[3], h0 = sliderValues()$LowerEst[4])
-        upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], h0 = sliderValues()$UpperEst[4])
-        
-        many_fits <- all_growthmodels(
-          selected_measurement ~ grow_baranyi(time, parms),
-          data = df,
-          p = p, lower = lower, upper = upper,
-          transform = "log", ncores = 2)
-      }
-      
-      else if (input$method == "huang") {
-        p   <- c(y0 = sliderValues()$InitialEstimate[1], mumax = sliderValues()$InitialEstimate[2], K = sliderValues()$InitialEstimate[3], alpha = sliderValues()$InitialEstimate[5],lambda = sliderValues()$InitialEstimate[6] )
-        lower   <- c(y0 = sliderValues()$LowerEst[1], mumax = sliderValues()$LowerEst[2], K = sliderValues()$LowerEst[3], alpha = sliderValues()$LowerEst[5],lambda = sliderValues()$LowerEst[6])
-        upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], alpha = sliderValues()$UpperEst[5],lambda = sliderValues()$UpperEst[6])
-        
-        many_fits <- all_growthmodels(
-          selected_measurement ~ grow_huang(time, parms),
           data = df,
           p = p, lower = lower, upper = upper,
           transform = "log", ncores = 2)
@@ -492,7 +459,7 @@ getData <- reactive({
   # plot with fitting
   output$plots <- renderPlot({
     #Plot results
-    if (input$pool=="None") {
+    if (input$pool=="per replicate") {
       if (length(results(Fitting()))<31){
         par(mfrow = c(6, 5))
         par(mar = c(2, 1, 1, 1))
@@ -500,7 +467,7 @@ getData <- reactive({
         par(mfrow = c(12, 5))
         par(mar = c(2, 1, 1, 1))
       }
-    } else if (input$pool=="replicates") {
+    } else if (input$pool=="pooled") {
       if (length(results(Fitting()))<11){
         par(mfrow = c(2, 5))
         par(mar = c(4, 4, 2, 1))
@@ -516,58 +483,53 @@ getData <- reactive({
   # plot maximal growth rate estimate over AB
   output$Gconc <- renderPlot({
     
-    if (input$pool!="replicates & concentration"){
-      res <- results(Fitting())
-      ordered<-order(res$drug_concentration)
-      m <- Fit_AB()
-  
-      par(mfrow = c(2, 1))
-      par(mar = c(4, 4, 1, 1))
-      plot(res$drug_concentration[ordered],res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate")
-      lines(res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2)
-      
-      plot(res$drug_concentration[ordered],res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate")
-      lines(res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2,log="x")
-    }
+    res <- results(Fitting())
+    ordered<-order(res$drug_concentration)
+    m <- Fit_AB()
+    
+    par(mfrow = c(2, 1))
+    par(mar = c(4, 4, 1, 1))
+    plot(res$drug_concentration[ordered],res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate")
+    lines(res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2)
+    
+    plot(res$drug_concentration[ordered],res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate")
+    lines(res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2,log="x")
     
   })
   
   output$results_step2 <- renderTable({
-    if (input$pool!="replicates & concentration"){
-      res <- results(Fitting())
-      m <- Fit_AB()
+    res <- results(Fitting())
+    m <- Fit_AB()
     
-      
-      if (input$model=="exp") {
-        dat<-data.frame(
-          Name = sliderValues2()$Name,
-          FittedParameters = coef(m)
-        )
-        return(dat)
-      }
-      
-      else if (input$model=="sigmoid_Emax") {
-        dat<-data.frame(
-          Name = sliderValues_Emax()$Name,
-          FittedParameters = coef(m)
-        )
-        return(dat)
-      }
-      
-      else if (input$model=="Emax") {
-        dat<-data.frame(
-          Name = sliderValues_Emax()$Name[c(1,2,3)],
-          FittedParameters = coef(m)
-        )
-        return(dat)
-      }
+    
+    if (input$model=="exp") {
+      dat<-data.frame(
+        Name = sliderValues2()$Name,
+        FittedParameters = coef(m)
+      )
+      return(dat)
+    }
+    
+    else if (input$model=="sigmoid_Emax") {
+      dat<-data.frame(
+        Name = sliderValues_Emax()$Name,
+        FittedParameters = coef(m)
+      )
+      return(dat)
+    }
+    
+    else if (input$model=="Emax") {
+      dat<-data.frame(
+        Name = sliderValues_Emax()$Name[c(1,2,3)],
+        FittedParameters = coef(m)
+      )
+      return(dat)
     }
   },digits=6)
   
   output$fit_step2 <- renderPrint({
-    if (input$pool!="replicates & concentration"){
     m <- Fit_AB()
-    summary(m)}
+    summary(m)
   })
   
   output$downloadData_step1 <- downloadHandler(
