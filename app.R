@@ -503,13 +503,13 @@ getData <- reactive({
     } else if (input$pool=="replicates") {
       if (length(results(Fitting()))<11){
         par(mfrow = c(2, 5))
-        par(mar = c(2.5, 4, 2, 1))
+        par(mar = c(4, 4, 2, 1))
       } else {
         par(mfrow = c(4, 5))
         par(mar = c(2.5, 4, 2, 1))
       }
     }
-    plot(Fitting())
+    plot(Fitting(),ylab="measurement", xlab="time")
   })
   
   
