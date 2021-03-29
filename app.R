@@ -31,10 +31,10 @@ ui <- fluidPage(
       # until the user explicitly clicks the button (rather than
       # doing it immediately when inputs change).
       fluidRow(
-        column(4,
-               actionButton("update_1", "Step 1: Compute growth rates")),
-        column(4,
-               actionButton("update_2", "Step 2: Compute pharmacodynamic relationship"))),
+        column(3,
+               actionButton("update_1", "Run Step 1")),
+        column(3,
+               actionButton("update_2", "Run Step 2"))),
       
       helpText("Note: Restart estimation when changing input parameters. If changing step 2 methods or parameters, it is only necessary to rerun step 2."),
       
