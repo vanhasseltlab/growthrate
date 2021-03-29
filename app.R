@@ -2,7 +2,7 @@ library(shiny)
 library(lattice)
 library(deSolve)
 library("growthrates")
-library(readr)
+#library(readr)
 
 ui <- fluidPage(
   
