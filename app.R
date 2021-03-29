@@ -39,7 +39,7 @@ ui <- fluidPage(
       helpText("Note: Restart estimation when changing input parameters. If changing step 2 methods or parameters, it is only necessary to rerun step 2."),
       
       radioButtons(inputId = "pool", label="Pool data according to:", choices = c("None","replicates"),selected="replicates"),
-      helpText("Note: Step 2 is only possible when data with different drug concentrations is not pooled together!"),
+      #helpText("Note: Step 2 is only possible when data with different drug concentrations is not pooled together!"),
 
       # Input: Selector for choosing method
       selectInput(inputId = "method",
