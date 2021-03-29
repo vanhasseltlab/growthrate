@@ -23,7 +23,7 @@ ui <- fluidPage(
       selectInput('selected_strain', label = 'Select a strain', choices = 'No choices here yet'),
       selectInput('selected_drug', label = 'Select a drug', choices = 'No choices here yet'),
       selectInput('selected_media', label = 'Select a media', choices = 'No choices here yet'),
-      selectInput('selected_measurement', label = 'Select measurement data', choices = c('raw_measurement',"corrected_measurement")),
+      selectInput('selected_measurement', label = 'Select measurement data', choices = c('raw_measurement',"corrected_measurement"),selected="corrected_measurement"),
       
       helpText("This shiny app fits time kill data in two steps. In step 1, the growth curves over time are fitted and the maximal growth rates are estimated. In step 2, the relation of maximal growth rates over drug concentration is fitted."),
       
@@ -31,14 +31,14 @@ ui <- fluidPage(
       # until the user explicitly clicks the button (rather than
       # doing it immediately when inputs change).
       fluidRow(
-        column(3,
-               actionButton("update_1", "Run step 1")),
-        column(3,
-               actionButton("update_2", "Run step 2"))),
+        column(4,
+               actionButton("update_1", "Step 1: Compute growth rates")),
+        column(4,
+               actionButton("update_2", "Step 2: Compute pharmacodynamic relationship"))),
       
       helpText("Note: Restart estimation when changing input parameters. If changing step 2 methods or parameters, it is only necessary to rerun step 2."),
       
-      radioButtons(inputId = "pool", label="Pool data according to:", choices = c("None","replicates","replicates & concentration"),selected="replicates"),
+      radioButtons(inputId = "pool", label="Compute growth rate per:", choices = c("None","replicates"),selected="replicates"),
       helpText("Note: Step 2 is only possible when data with different drug concentrations is not pooled together!"),
 
       # Input: Selector for choosing method
@@ -172,7 +172,7 @@ ui <- fluidPage(
       
       conditionalPanel(
         condition = "input.model != 'exp'",
-        radioButtons(inputId = "guess", label="Guess step 2 paras:", choices = c("yes","no")),
+        radioButtons(inputId = "guess", label="Guess step 2 parameters:", choices = c("yes","no")),
         conditionalPanel(
           condition = "input.guess == 'no'",
           # Numeric input of parameters step 2
