@@ -4,8 +4,8 @@ Shiny app- Maximal growth rate estimator
 Link: http://132.229.100.197:2222/growthrate/
 
 Author: Catharina Meyer
-
 Contact: c.meyer@lacdr.leidenuniv.nl
+Quantitative Pharmacology, LACDR, Leiden University
 
 This shiny app fits time kill data in two steps. In step 1, the growth curves over time are fitted and the maximal growth rates are estimated. In step 2, the relation of maximal growth rates over drug concentration is fitted.
 
