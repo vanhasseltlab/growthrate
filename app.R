@@ -2,7 +2,7 @@ library(shiny)
 library(lattice)
 library(deSolve)
 library("growthrates")
-library(ggplot2)
+# library(ggplot2)
 
 ui <- fluidPage(
   
