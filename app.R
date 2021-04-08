@@ -2,6 +2,7 @@ library(shiny)
 library(lattice)
 library(deSolve)
 library("growthrates")
+library(ggplot2)
 
 ui <- fluidPage(
   
@@ -18,10 +19,14 @@ ui <- fluidPage(
                 multiple = FALSE,
                 accept = c(".csv")),
 
-      
-      selectInput('selected_strain', label = 'Select a strain', choices = 'No choices here yet'),
-      selectInput('selected_drug', label = 'Select a drug', choices = 'No choices here yet'),
-      selectInput('selected_media', label = 'Select a media', choices = 'No choices here yet'),
+      radioButtons(inputId = "all", label="Process the whole plate?", choices = c("yes","no"),selected="no"),
+      conditionalPanel(
+        condition = "input.all != 'yes'",
+        selectInput('selected_strain', label = 'Select a strain', choices = 'No choices here yet'),
+        selectInput('selected_drug', label = 'Select a drug', choices = 'No choices here yet'),
+        selectInput('selected_media', label = 'Select a media', choices = 'No choices here yet')
+      ),
+
       selectInput('selected_measurement', label = 'Select measurement data', choices = c('raw_measurement',"corrected_measurement"),selected="corrected_measurement"),
       
       helpText("This shiny app fits time kill data in two steps. In step 1, the growth curves over time are fitted and the maximal growth rates are estimated. In step 2, the relation of maximal growth rates over drug concentration is fitted."),
@@ -199,7 +204,7 @@ ui <- fluidPage(
             column(3,
                    numericInput("k", "Hill parameter: k",
                                 min = -5, max = 5,
-                                value = 1, step = 0.1))
+                                value = 5, step = 0.1))
           )
           
         )
@@ -289,7 +294,12 @@ server <- function(input, output,session) {
 getData <- reactive({
   req(input$file1)
   df <- read.csv(input$file1$datapath)
-  df_subset <- subset(df, (df$strain_name==input$selected_strain) & (df$drug_name==input$selected_drug) & (df$media_name==input$selected_media))
+  if (input$all=="no") {
+    df_subset <- subset(df, (df$strain_name==input$selected_strain) & (df$drug_name==input$selected_drug) & (df$media_name==input$selected_media))
+  }
+  else if (input$all=="yes") {
+    df_subset <- df
+  }
   df_subset$corrected_measurement <- as.numeric(as.character(df_subset$corrected_measurement))
   return(df_subset)
 })
@@ -308,8 +318,7 @@ getData <- reactive({
     
     if (input$pool=="pooled") {
       if (input$method == "smoothing") {
-        # Smooting for mutliple data sets for groups "strain_name" "drug_concentration"
-        many_fits <- all_splines(selected_measurement ~ time | drug_concentration,
+        many_fits <- all_splines(selected_measurement ~ time | strain_name + drug_concentration + drug_name + media_name ,
                                  data = df, spar = 0.5)
       }
       
@@ -319,7 +328,7 @@ getData <- reactive({
         upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], h0 = sliderValues()$UpperEst[4])
         
         many_fits <- all_growthmodels(
-          selected_measurement ~ grow_baranyi(time, parms) | drug_concentration,
+          selected_measurement ~ grow_baranyi(time, parms) | strain_name + drug_concentration + drug_name + media_name,
           data = df,
           p = p, lower = lower, upper = upper,
           transform = "log", ncores = 2)
@@ -331,7 +340,7 @@ getData <- reactive({
         upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], alpha = sliderValues()$UpperEst[5],lambda = sliderValues()$UpperEst[6])
         
         many_fits <- all_growthmodels(
-          selected_measurement ~ grow_huang(time, parms) |  drug_concentration,
+          selected_measurement ~ grow_huang(time, parms) |  strain_name + drug_concentration + drug_name + media_name,
           data = df,
           p = p, lower = lower, upper = upper,
           transform = "log", ncores = 2)
@@ -341,7 +350,7 @@ getData <- reactive({
     else if (input$pool=="per replicate"){
       if (input$method == "smoothing") {
         # Smooting for mutliple data sets 
-        many_fits <- all_splines(selected_measurement ~ time | drug_concentration + replicate_ID,
+        many_fits <- all_splines(selected_measurement ~ time | strain_name + drug_concentration + replicate_ID + drug_name + media_name,
                                  data = df, spar = 0.5)
       }
       
@@ -351,7 +360,7 @@ getData <- reactive({
         upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], h0 = sliderValues()$UpperEst[4])
         
         many_fits <- all_growthmodels(
-          selected_measurement ~ grow_baranyi(time, parms) | drug_concentration + replicate_ID,
+          selected_measurement ~ grow_baranyi(time, parms) | strain_name + drug_concentration + replicate_ID + drug_name + media_name,
           data = df,
           p = p, lower = lower, upper = upper,
           transform = "log", ncores = 2)
@@ -363,7 +372,7 @@ getData <- reactive({
         upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], alpha = sliderValues()$UpperEst[5],lambda = sliderValues()$UpperEst[6])
         
         many_fits <- all_growthmodels(
-          selected_measurement ~ grow_huang(time, parms) | drug_concentration + replicate_ID,
+          selected_measurement ~ grow_huang(time, parms) | strain_name + drug_concentration + replicate_ID + drug_name + media_name,
           data = df,
           p = p, lower = lower, upper = upper,
           transform = "log", ncores = 2)
@@ -371,17 +380,39 @@ getData <- reactive({
       
     }
     
-    res <- results(many_fits)
+    # res <- results(many_fits) ### DO I NEED THIS???
     return(many_fits)
   })
   
   # this function determines initial parameter guesses for Emax and sigmoid Emax - step 2
-  guessInitials <- function() { 
-    res <- results(Fitting())
+  # guessInitials <- function() { 
+  #   res <- results(Fitting())
+  #   #set E0 guess as the highest value of conc lower than 0.5 or as the first one
+  #   if (subset(res, res$mumax==max(res$mumax))$drug_concentration<0.5) {
+  #     E0_x <- max(res$mumax)
+  #   } else {E0_x<-res$mumax[1]}
+  #   # E_max guess is the difference between the last value minus E0_x
+  #   E_max_x <- res$mumax[length(res$mumax)]-E0_x
+  #   # EC50 is the drug concentration for which half the maximal growth rate is reached
+  #   EC50_yx <- E0_x-((E0_x-res$mumax[length(res$mumax)])/2)
+  #   EC50_yx_dif <- abs(res$mumax-EC50_yx)
+  #   which_x <- which(EC50_yx_dif==min(EC50_yx_dif))
+  #   half_mumax <- res$mumax[which_x]
+  #   EC50_x <-  res$drug_concentration[which_x]
+  #   # for k the default slider value is used
+  #   k_x<-sliderValues_Emax()$Est[4]
+  #   # k_x<-5
+  #   
+  #   # return(c(E0_x,E_max_x,EC50_x,k_x))
+  #   return(c(E0=E0_x,E_max=E_max_x,EC50=EC50_x,k=k_x))
+  # }
+  
+  guessInitials <- function(res) { 
     #set E0 guess as the highest value of conc lower than 0.5 or as the first one
-    if (subset(res, res$mumax==max(res$mumax))$drug_concentration<0.5) {
-      E0_x <- max(res$mumax)
-    } else {E0_x<-res$mumax[1]}
+    # if (subset(res, res$mumax==max(res$mumax))$drug_concentration<0.5) {# CHANGE THI TO BE THE FIRST
+    #   E0_x <- max(res$mumax)
+    # } else {E0_x<-res$mumax[1]}
+    E0_x<-res$mumax[1]
     # E_max guess is the difference between the last value minus E0_x
     E_max_x <- res$mumax[length(res$mumax)]-E0_x
     # EC50 is the drug concentration for which half the maximal growth rate is reached
@@ -392,36 +423,56 @@ getData <- reactive({
     EC50_x <-  res$drug_concentration[which_x]
     # for k the default slider value is used
     k_x<-sliderValues_Emax()$Est[4]
-    return(c(E0_x,E_max_x,EC50_x,k_x))
+    # k_x<-5
+    
+    return(c(E0=E0_x,E_max=E_max_x,EC50=EC50_x,k=k_x))
   }
-  
+
+  combinations <- function() {
+    df <- getData()
+    if (input$all == 'no') {
+      comb <- data.frame(
+        strain_names = input$selected_strain,
+        drug_names= input$selected_drug,
+        media_names=input$selected_media)
+    } else if (input$all == 'yes') {
+      comb <- expand.grid(levels(df$strain_name), levels(df$drug_name), levels(df$media_name))
+    }
+    return(comb)
+  }  
   
   #step 2 fitting
   Fit_AB <- eventReactive(input$update_2,{
-    res <- results(Fitting())
-    
-    if (input$model=="exp"){
-      m <- nls(mumax ~ a*exp(b*drug_concentration)+c,
-                      data = res, start=c(a=sliderValues2()$Est[1], b= sliderValues2()$Est[2], c=sliderValues2()$Est[3]))
-    }
-    
-    else if (input$model=="sigmoid_Emax") {
-      if (input$guess=="yes"){
-        Inits <- guessInitials()
-      } else {Inits <-c(sliderValues_Emax()$Est_m[1],sliderValues_Emax()$Est_m[2], sliderValues_Emax()$Est_m[3], sliderValues_Emax()$Est_m[4])}
-      Inits <- guessInitials()
-      m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50)**k)/(1+((drug_concentration/EC50)**k))),
-                      data = res, start=c(E0=Inits[1],E_max=Inits[2], EC50=Inits[3], k=Inits[4]))
-    }
-    
-    else if (input$model=="Emax") {
-      if (input$guess=="yes"){
-        Inits <- guessInitials()
-      } else {Inits <-c(sliderValues_Emax()$Est_m[1],sliderValues_Emax()$Est_m[2], sliderValues_Emax()$Est_m[3], sliderValues_Emax()$Est_m[4])}
-      Inits <- guessInitials()
-      m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50))/(1+((drug_concentration/EC50)))),
-                      data = res, start=c(E0=Inits[1],E_max=Inits[2], EC50=Inits[3]))
-    }
+    comb <- combinations()
+    m <- list()
+    many_fits <- Fitting()
+    for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
+      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+      res <- results(part_many_fits)
+
+      if (input$model=="exp"){
+        part_m <- nls(mumax ~ a*exp(b*drug_concentration)+c,
+                        data = res, start=c(a=sliderValues2()$Est[1], b= sliderValues2()$Est[2], c=sliderValues2()$Est[3]))
+      }
+      
+      else if (input$model=="sigmoid_Emax") {
+        if (input$guess=="yes"){
+          Inits <- guessInitials(res)
+        } else {Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+        part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50)**k)/(1+((drug_concentration/EC50)**k))),
+                 data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
+      }
+      
+      else if (input$model=="Emax") {
+        if (input$guess=="yes"){
+          Inits <- guessInitials(res)
+        } else {
+          Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+        part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50))/(1+((drug_concentration/EC50)))),
+                 data = res, start=c(Inits[1], Inits[2], Inits[3]))
+      }
+      m<-append(m,list(part_m))
+      }
     return(m)
     
   })
@@ -459,77 +510,99 @@ getData <- reactive({
   # plot with fitting
   output$plots <- renderPlot({
     #Plot results
-    if (input$pool=="per replicate") {
-      if (length(results(Fitting()))<31){
-        par(mfrow = c(6, 5))
-        par(mar = c(2, 1, 1, 1))
-      } else {
-        par(mfrow = c(12, 5))
-        par(mar = c(2, 1, 1, 1))
-      }
-    } else if (input$pool=="pooled") {
-      if (length(results(Fitting()))<11){
-        par(mfrow = c(2, 5))
-        par(mar = c(4, 4, 2, 1))
-      } else {
-        par(mfrow = c(4, 5))
-        par(mar = c(2.5, 4, 2, 1))
-      }
+    many_fits <- Fitting()
+    
+    l_plot <- ceiling((length(rownames(results(many_fits))))/5)
+    par(mfrow = c(l_plot, 5))
+    if (l_plot>6) { # for more than 6 rows
+      par(mar = c(2, 1, 1, 1))
+    } else if (l_plot<=6) {
+      par(mar = c(2, 1, 1, 1))
+    } else if (l_plot<=4) {
+      par(mar = c(2.5, 4, 2, 1))
+    } else if (l_plot<=2) {
+      par(mar = c(4, 4, 2, 1))
     }
-    plot(Fitting(),ylab="measurement", xlab="time")
+    
+    comb <- combinations()
+    for(row in 1:nrow(comb)) {
+      part_plot <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+      plot(part_plot,ylab="measurement", xlab="time")
+    }
   })
+  
   
   
   # plot maximal growth rate estimate over AB
   output$Gconc <- renderPlot({
-    
-    res <- results(Fitting())
-    ordered<-order(res$drug_concentration)
     m <- Fit_AB()
-    
-    par(mfrow = c(2, 1))
-    par(mar = c(4, 4, 1, 1))
-    plot(res$drug_concentration[ordered],res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate")
-    lines(res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2)
-    
-    plot(res$drug_concentration[ordered],res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate")
-    lines(res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2,log="x")
-    
+    par(mfrow = c(2, 2))
+    par(mar = c(4, 4, 2, 1))
+    comb <- combinations()
+    many_fits <- Fitting()
+    for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
+      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+      part_res <- results(part_many_fits)
+      ordered<-order(part_res$drug_concentration)
+      
+      plot(part_res$drug_concentration[ordered],part_res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate", main = as.character(part_res$strain_name[[1]]))
+      lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2)
+      
+      plot(part_res$drug_concentration[ordered],part_res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate",  main = as.character(part_res$strain_name[[1]]))
+      lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2,log="x")
+    }
   })
   
-  output$results_step2 <- renderTable({
-    res <- results(Fitting())
+  results_step2 <- function() {
+    comb <- combinations()
+    many_fits <- Fitting()
+    res <- results(many_fits)
     m <- Fit_AB()
     
+    columns <- c( "drug_name", "strain_name", "media_name")
     
     if (input$model=="exp") {
-      dat<-data.frame(
-        Name = sliderValues2()$Name,
-        FittedParameters = coef(m)
-      )
-      return(dat)
+      name = sliderValues_Emax()$Name
+    } else if (input$model=="sigmoid_Emax") {
+      name = c("E0","E_max","EC50","k")
+    } else if (input$model=="Emax") {
+      name = sliderValues_Emax()$Name[c(1,2,3)]
     }
     
-    else if (input$model=="sigmoid_Emax") {
-      dat<-data.frame(
-        Name = sliderValues_Emax()$Name,
-        FittedParameters = coef(m)
-      )
-      return(dat)
-    }
+    columns <- c(columns, name)
+    ncol <- length(columns)
+    d <- setNames(data.frame(matrix(ncol = ncol, nrow = 0)), columns)
     
-    else if (input$model=="Emax") {
-      dat<-data.frame(
-        Name = sliderValues_Emax()$Name[c(1,2,3)],
-        FittedParameters = coef(m)
-      )
-      return(dat)
+    for (row in 1:nrow(comb)) {
+      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+      part_res <- results(part_many_fits)
+      # columns_part_res <- colnames(part_res)
+      
+      vec1 <- list(drug_name = as.character(comb[row,2]),strain_name = as.character(comb[row,1]),media_name = as.character(comb[row,3]))
+      vec2 <- c(coef(m[[row]]))
+      vec <-c(vec1,vec2)
+      
+      #convert factor columns to character
+      i <- sapply(d, is.factor)
+      d[i] <- lapply(d[i], as.character)
+      d <- rbind(d, vec)
     }
-  },digits=6)
+    return(d)
+  }
+  
+  output$results_step2 <- renderTable({
+    d <- results_step2()
+    # return(d)
+    },digits=6)
+    
   
   output$fit_step2 <- renderPrint({
     m <- Fit_AB()
-    summary(m)
+    comb <- combinations()
+    for (i in 1:length(m)) {
+      print(paste("Drug= ",comb[i,2], " , Strain= ", comb[i,1], " Media= ", comb[i,3] ))[[1]]
+      print(summary(m[[i]]))
+    }
   })
   
   output$downloadData_step1 <- downloadHandler(
@@ -546,7 +619,7 @@ getData <- reactive({
       paste("Step2_results-", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(results(Fitting()), file)
+      write.csv(results_step2(), file)
     }
   )
 }
