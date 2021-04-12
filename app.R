@@ -293,7 +293,7 @@ server <- function(input, output,session) {
 
 getData <- reactive({
   req(input$file1)
-  df <- read.csv(input$file1$datapath, stringsAsFactors=TRUE)
+  df <- read.csv(input$file1$datapath)
   if (input$all=="no") {
     df_subset <- subset(df, (df$strain_name==input$selected_strain) & (df$drug_name==input$selected_drug) & (df$media_name==input$selected_media))
   }
