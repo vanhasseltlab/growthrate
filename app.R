@@ -20,12 +20,12 @@ ui <- fluidPage(
                 accept = c(".csv")),
 
       radioButtons(inputId = "all", label="Process the whole plate?", choices = c("yes","no"),selected="no"),
-      conditionalPanel(
-        condition = "input.all != 'yes'",
+      # conditionalPanel(
+      #   condition = "input.all != 'yes'",
         selectInput('selected_strain', label = 'Select a strain', choices = 'No choices here yet'),
         selectInput('selected_drug', label = 'Select a drug', choices = 'No choices here yet'),
-        selectInput('selected_media', label = 'Select a media', choices = 'No choices here yet')
-      ),
+        selectInput('selected_media', label = 'Select a media', choices = 'No choices here yet'),
+      # ),
 
       selectInput('selected_measurement', label = 'Select measurement data', choices = c('raw_measurement',"corrected_measurement"),selected="corrected_measurement"),
       
