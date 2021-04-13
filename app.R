@@ -238,7 +238,7 @@ ui <- fluidPage(
 server <- function(input, output,session) {
   
   observeEvent(input$file1, {
-    mytable <- read.csv(input$file1$datapath)
+    mytable <- read.csv(input$file1$datapath, stringsAsFactors=TRUE)
     updateSelectInput(session, "selected_strain", label = "Select a strain", choices = levels(mytable$strain_name))
     updateSelectInput(session, "selected_drug", label = "Select a drug", choices = levels(mytable$drug_name))
     updateSelectInput(session, "selected_media", label = "Select a media", choices = levels(mytable$media_name))
@@ -293,7 +293,7 @@ server <- function(input, output,session) {
 
 getData <- reactive({
   req(input$file1)
-  df <- read.csv(input$file1$datapath)
+  df <- read.csv(input$file1$datapath, stringsAsFactors=TRUE)
   if (input$all=="no") {
     df_subset <- subset(df, (df$strain_name==input$selected_strain) & (df$drug_name==input$selected_drug) & (df$media_name==input$selected_media))
   }
@@ -500,7 +500,7 @@ getData <- reactive({
   # Show input data in HTML table
   output$data <- renderTable({
     req(input$file1)
-    df <- read.csv(input$file1$datapath)
+    df <- read.csv(input$file1$datapath, stringsAsFactors=TRUE)
     return(df)
     },digits=6)
   
