@@ -155,7 +155,7 @@ ui <- fluidPage(
         )
       ),
 
-      radioButtons(inputId = "model", label="Choose a model for step 2:", choices = c("exp","Emax","sigmoid_Emax"), selected="sigmoid_Emax"),
+      radioButtons(inputId = "model", label="Choose a model for step 2:", choices = c("exp","Emax","sigmoid_Emax", "capacity_Emax"), selected="sigmoid_Emax"),
       conditionalPanel(
         condition = "input.model == 'exp'",
         helpText("Exponential model equation: mumax[drug_concentration] = a*exp(b*drug_concentration)+c"),
@@ -413,8 +413,13 @@ getData <- reactive({
     #   E0_x <- max(res$mumax)
     # } else {E0_x<-res$mumax[1]}
     E0_x<-res$mumax[1]
-    # E_max guess is the difference between the last value minus E0_x
-    E_max_x <- res$mumax[length(res$mumax)]-E0_x
+    
+    if (input$model!="capacity_Emax") {
+      # E_max guess is the difference between the last value minus E0_x
+      E_max_x <- res$mumax[length(res$mumax)]-E0_x
+    } else if (input$model=="capacity_Emax") {
+      E_max_x <- (res$mumax[length(res$mumax)]/E0_x)-1
+    }
     # EC50 is the drug concentration for which half the maximal growth rate is reached
     EC50_yx <- E0_x-((E0_x-res$mumax[length(res$mumax)])/2)
     EC50_yx_dif <- abs(res$mumax-EC50_yx)
@@ -471,6 +476,17 @@ getData <- reactive({
         part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50))/(1+((drug_concentration/EC50)))),
                  data = res, start=c(Inits[1], Inits[2], Inits[3]))
       }
+      
+      else if (input$model=="capacity_Emax") {
+        if (input$guess=="yes"){
+          Inits <- guessInitials(res)
+        } else {
+          Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+        part_m <- nls(mumax ~ E0*(1+ E_max * (((drug_concentration/EC50)**k)/(1 + ((drug_concentration/EC50)**k)))),
+                      data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
+        # E0*(1- E_max * (((drug_concentration/EC50)^k)/(1 + ((drug_concentration/EC50)^k)))
+      }
+      
       m<-append(m,list(part_m))
       }
     return(m)
@@ -536,7 +552,8 @@ getData <- reactive({
   # plot maximal growth rate estimate over AB
   output$Gconc <- renderPlot({
     m <- Fit_AB()
-    par(mfrow = c(2, 2))
+    l_plot <- length(m)
+    par(mfrow = c(l_plot, 2))
     par(mar = c(4, 4, 2, 1))
     comb <- combinations()
     many_fits <- Fitting()
@@ -567,6 +584,8 @@ getData <- reactive({
       name = c("E0","E_max","EC50","k")
     } else if (input$model=="Emax") {
       name = sliderValues_Emax()$Name[c(1,2,3)]
+    } else if (input$model=="capacity_Emax") {
+      name = c("E0","E_max","EC50","k")
     }
     
     columns <- c(columns, name)
