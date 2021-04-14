@@ -28,6 +28,7 @@ ui <- fluidPage(
       ),
 
       selectInput('selected_measurement', label = 'Select measurement data', choices = c('raw_measurement',"corrected_measurement"),selected="corrected_measurement"),
+      selectInput('selected_time', label = 'Exclude time points before:', choices = 'No choices here yet'),
       
       helpText("This shiny app fits time kill data in two steps. In step 1, the growth curves over time are fitted and the maximal growth rates are estimated. In step 2, the relation of maximal growth rates over drug concentration is fitted."),
       
@@ -238,10 +239,12 @@ ui <- fluidPage(
 server <- function(input, output,session) {
   
   observeEvent(input$file1, {
-    mytable <- read.csv(input$file1$datapath, stringsAsFactors=TRUE)
-    updateSelectInput(session, "selected_strain", label = "Select a strain", choices = levels(mytable$strain_name))
-    updateSelectInput(session, "selected_drug", label = "Select a drug", choices = levels(mytable$drug_name))
-    updateSelectInput(session, "selected_media", label = "Select a media", choices = levels(mytable$media_name))
+    df_all <- getData_all()
+    updateSelectInput(session, "selected_strain", label = "Select a strain", choices = levels(df_all$strain_name))
+    updateSelectInput(session, "selected_drug", label = "Select a drug", choices = levels(df_all$drug_name))
+    updateSelectInput(session, "selected_media", label = "Select a media", choices = levels(df_all$media_name))
+    updateSelectInput(session, "selected_time", label = 'Exclude time points before:', choices = levels(as.factor((df_all$time))))
+    
   })
   
   # input values step 1 fitting
@@ -271,7 +274,7 @@ server <- function(input, output,session) {
   })
   
   # input values for step 2 exp fitting
-  sliderValues2 <- eventReactive(input$update_2,{
+  sliderValues_exp <- eventReactive(input$update_2,{
     data.frame(
       Name = c("a", "b","c"),
       Est_s = c(input$a,
@@ -291,22 +294,29 @@ server <- function(input, output,session) {
       stringsAsFactors = FALSE)
   })
 
-getData <- reactive({
-  req(input$file1)
-  df <- read.csv(input$file1$datapath, stringsAsFactors=TRUE)
+
+  getData_all <- reactive({
+    req(input$file1)
+    df_all <- read.csv(input$file1$datapath, stringsAsFactors=TRUE)
+    return(df_all)
+  })
+  
+  getData_subset <- reactive({
+    df_all <- getData_all()
   if (input$all=="no") {
-    df_subset <- subset(df, (df$strain_name==input$selected_strain) & (df$drug_name==input$selected_drug) & (df$media_name==input$selected_media))
+    df_subset <- subset(df_all, (df_all$strain_name==input$selected_strain) & (df_all$drug_name==input$selected_drug) & (df_all$media_name==input$selected_media))
   }
   else if (input$all=="yes") {
-    df_subset <- df
+    df_subset <- df_all
   }
   df_subset$corrected_measurement <- as.numeric(as.character(df_subset$corrected_measurement))
-  return(df_subset)
+  df_subset <- subset(df_subset, (df_subset$time>=input$selected_time))
+  return(df_subset) 
 })
 
   # step 1 fitting/ not modularized yet
   Fitting <- eventReactive(input$update_1,{
-    df <- getData()
+    df <- getData_subset()
     
     # select subset of data according to user input
     # changes column name df, sorry about that
@@ -379,39 +389,17 @@ getData <- reactive({
       }
       
     }
-    
-    # res <- results(many_fits) ### DO I NEED THIS???
     return(many_fits)
   })
   
-  # this function determines initial parameter guesses for Emax and sigmoid Emax - step 2
-  # guessInitials <- function() { 
-  #   res <- results(Fitting())
-  #   #set E0 guess as the highest value of conc lower than 0.5 or as the first one
-  #   if (subset(res, res$mumax==max(res$mumax))$drug_concentration<0.5) {
-  #     E0_x <- max(res$mumax)
-  #   } else {E0_x<-res$mumax[1]}
-  #   # E_max guess is the difference between the last value minus E0_x
-  #   E_max_x <- res$mumax[length(res$mumax)]-E0_x
-  #   # EC50 is the drug concentration for which half the maximal growth rate is reached
-  #   EC50_yx <- E0_x-((E0_x-res$mumax[length(res$mumax)])/2)
-  #   EC50_yx_dif <- abs(res$mumax-EC50_yx)
-  #   which_x <- which(EC50_yx_dif==min(EC50_yx_dif))
-  #   half_mumax <- res$mumax[which_x]
-  #   EC50_x <-  res$drug_concentration[which_x]
-  #   # for k the default slider value is used
-  #   k_x<-sliderValues_Emax()$Est[4]
-  #   # k_x<-5
-  #   
-  #   # return(c(E0_x,E_max_x,EC50_x,k_x))
-  #   return(c(E0=E0_x,E_max=E_max_x,EC50=EC50_x,k=k_x))
-  # }
+  Results <- reactive({
+    res <- results(Fitting())
+    return(res)
+  })
   
-  guessInitials <- function(res) { 
-    #set E0 guess as the highest value of conc lower than 0.5 or as the first one
-    # if (subset(res, res$mumax==max(res$mumax))$drug_concentration<0.5) {# CHANGE THI TO BE THE FIRST
-    #   E0_x <- max(res$mumax)
-    # } else {E0_x<-res$mumax[1]}
+  guessInitials <- reactive({
+    #set E0 guess as first one value
+    res <- Results()
     E0_x<-res$mumax[1]
     
     if (input$model!="capacity_Emax") {
@@ -429,12 +417,11 @@ getData <- reactive({
     # for k the default slider value is used
     k_x<-sliderValues_Emax()$Est[4]
     # k_x<-5
-    
     return(c(E0=E0_x,E_max=E_max_x,EC50=EC50_x,k=k_x))
-  }
+  })
 
-  combinations <- function() {
-    df <- getData()
+  combinations <- reactive({
+    df <- getData_subset()
     if (input$all == 'no') {
       comb <- data.frame(
         strain_names = input$selected_strain,
@@ -444,7 +431,7 @@ getData <- reactive({
       comb <- expand.grid(levels(df$strain_name), levels(df$drug_name), levels(df$media_name))
     }
     return(comb)
-  }  
+  })  
   
   #step 2 fitting
   Fit_AB <- eventReactive(input$update_2,{
@@ -457,12 +444,12 @@ getData <- reactive({
 
       if (input$model=="exp"){
         part_m <- nls(mumax ~ a*exp(b*drug_concentration)+c,
-                        data = res, start=c(a=sliderValues2()$Est[1], b= sliderValues2()$Est[2], c=sliderValues2()$Est[3]))
+                        data = res, start=c(a=sliderValues_exp()$Est[1], b= sliderValues_exp()$Est[2], c=sliderValues_exp()$Est[3]))
       }
       
       else if (input$model=="sigmoid_Emax") {
         if (input$guess=="yes"){
-          Inits <- guessInitials(res)
+          Inits <- guessInitials()
         } else {Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
         part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50)**k)/(1+((drug_concentration/EC50)**k))),
                  data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
@@ -470,7 +457,7 @@ getData <- reactive({
       
       else if (input$model=="Emax") {
         if (input$guess=="yes"){
-          Inits <- guessInitials(res)
+          Inits <- guessInitials()
         } else {
           Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
         part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50))/(1+((drug_concentration/EC50)))),
@@ -479,7 +466,7 @@ getData <- reactive({
       
       else if (input$model=="capacity_Emax") {
         if (input$guess=="yes"){
-          Inits <- guessInitials(res)
+          Inits <- guessInitials()
         } else {
           Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
         part_m <- nls(mumax ~ E0*(1+ E_max * (((drug_concentration/EC50)**k)/(1 + ((drug_concentration/EC50)**k)))),
@@ -515,13 +502,12 @@ getData <- reactive({
 
   # Show input data in HTML table
   output$data <- renderTable({
-    req(input$file1)
-    df <- read.csv(input$file1$datapath, stringsAsFactors=TRUE)
-    return(df)
+    df_all <- getData_all()
+    return(df_all)
     },digits=6)
   
   # show fitting results in table
-  output$results <- renderTable(results(Fitting()), digits=6)
+  output$results <- renderTable(Results(), digits=6)
  
   # plot with fitting
   output$plots <- renderPlot({
@@ -629,7 +615,7 @@ getData <- reactive({
       paste("Step1_results-", Sys.Date(), ".csv", sep="")
     },
     content = function(file) {
-      write.csv(results(Fitting()), file)
+      write.csv(Results(), file)
     }
   )
   
