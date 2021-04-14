@@ -156,6 +156,13 @@ ui <- fluidPage(
       ),
 
       radioButtons(inputId = "model", label="Choose a model for step 2:", choices = c("exp","Emax","sigmoid_Emax", "capacity_Emax"), selected="sigmoid_Emax"),
+      
+      conditionalPanel(
+        condition = "input.model == 'capacity_Emax'",
+        radioButtons(inputId = "fitting_type", label="Choose fitting type for parameters:", choices = c("individual","shared"), selected = "individual"),
+        
+        ),
+      
       conditionalPanel(
         condition = "input.model == 'exp'",
         helpText("Exponential model equation: mumax[drug_concentration] = a*exp(b*drug_concentration)+c"),
@@ -175,7 +182,7 @@ ui <- fluidPage(
           ))),
       
       conditionalPanel(
-        condition = "input.model != 'exp'",
+        condition = ("(input.model == 'Emax') | (input.model == 'sigmoid_Emax') | ((input.model == 'capacity_Emax') & (input.fitting_type=='individual'))"),
         radioButtons(inputId = "guess", label="Guess step 2 parameters:", choices = c("yes","no")),
         conditionalPanel(
           condition = "input.guess == 'no'",
@@ -325,7 +332,7 @@ server <- function(input, output,session) {
   })
 
   combinations_R <- reactive({
-    df <- getData_subset_R() # why subset?
+    df <- getData_subset_R() # why subset
     comb <- combinations(df)
     return(comb)
   })  
@@ -433,46 +440,116 @@ server <- function(input, output,session) {
   }
   
   
+  # Fit_PD <- function(comb, many_fits){
+  #   m <- list()
+  #   for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
+  #     part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+  #     res <- results(part_many_fits)
+  #     
+  #     if (input$model=="exp"){
+  #       part_m <- nls(mumax ~ a*exp(b*drug_concentration)+c,
+  #                     data = res, start=c(a=sliderValues_exp()$Est[1], b= sliderValues_exp()$Est[2], c=sliderValues_exp()$Est[3]))
+  #     }
+  #     
+  #     else if (input$model=="sigmoid_Emax") {
+  #       if (input$guess=="yes"){
+  #         Inits <- guessInitials(res)
+  #       } else {Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+  #       part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50)**k)/(1+((drug_concentration/EC50)**k))),
+  #                     data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
+  #     }
+  #     
+  #     else if (input$model=="Emax") {
+  #       if (input$guess=="yes"){
+  #         Inits <- guessInitials(res)
+  #       } else {
+  #         Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+  #       part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50))/(1+((drug_concentration/EC50)))),
+  #                     data = res, start=c(Inits[1], Inits[2], Inits[3]))
+  #     }
+  #     
+  #     else if (input$model=="capacity_Emax") {
+  #       if (input$guess=="yes"){
+  #         Inits <- guessInitials(res)
+  #       } else {
+  #         Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+  #       part_m <- nls(mumax ~ E0*(1+ E_max * (((drug_concentration/EC50)**k)/(1 + ((drug_concentration/EC50)**k)))),
+  #                     data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
+  #       # E0*(1- E_max * (((drug_concentration/EC50)^k)/(1 + ((drug_concentration/EC50)^k)))
+  #     }
+  #     
+  #     m<-append(m,list(part_m))
+  #   }
+  #   return(m)
+  # }
+  
   Fit_PD <- function(comb, many_fits){
-    m <- list()
-    for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
-      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
-      res <- results(part_many_fits)
-      
-      if (input$model=="exp"){
-        part_m <- nls(mumax ~ a*exp(b*drug_concentration)+c,
-                      data = res, start=c(a=sliderValues_exp()$Est[1], b= sliderValues_exp()$Est[2], c=sliderValues_exp()$Est[3]))
+    if (input$fitting_type=="individual" | (input$fitting_type=="shared" & input$model!="capacity_Emax")) {
+      m <- list()
+      for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
+        part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+        res <- results(part_many_fits)
+        
+        if (input$model=="exp"){
+          part_m <- nls(mumax ~ a*exp(b*drug_concentration)+c,
+                        data = res, start=c(a=sliderValues_exp()$Est[1], b= sliderValues_exp()$Est[2], c=sliderValues_exp()$Est[3]))
+        }
+        
+        else if (input$model=="sigmoid_Emax") {
+          if (input$guess=="yes"){
+            Inits <- guessInitials(res)
+          } else {Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+          part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50)**k)/(1+((drug_concentration/EC50)**k))),
+                        data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
+        }
+        
+        else if (input$model=="Emax") {
+          if (input$guess=="yes"){
+            Inits <- guessInitials(res)
+          } else {
+            Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+          part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50))/(1+((drug_concentration/EC50)))),
+                        data = res, start=c(Inits[1], Inits[2], Inits[3]))
+        }
+        
+        else if (input$model=="capacity_Emax") {
+          if (input$guess=="yes"){
+            Inits <- guessInitials(res)
+          } else {
+            Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+          part_m <- nls(mumax ~ E0*(1+ E_max * (((drug_concentration/EC50)**k)/(1 + ((drug_concentration/EC50)**k)))),
+                        data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
+          # E0*(1- E_max * (((drug_concentration/EC50)^k)/(1 + ((drug_concentration/EC50)^k)))
+        }
+        
+        m<-append(m,list(part_m))
       }
       
-      else if (input$model=="sigmoid_Emax") {
-        if (input$guess=="yes"){
-          Inits <- guessInitials(res)
-        } else {Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
-        part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50)**k)/(1+((drug_concentration/EC50)**k))),
-                      data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
-      }
       
-      else if (input$model=="Emax") {
-        if (input$guess=="yes"){
-          Inits <- guessInitials(res)
-        } else {
-          Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
-        part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50))/(1+((drug_concentration/EC50)))),
-                      data = res, start=c(Inits[1], Inits[2], Inits[3]))
-      }
+    } else if (input$fitting_type=="shared" & input$model=="capacity_Emax") {
       
-      else if (input$model=="capacity_Emax") {
-        if (input$guess=="yes"){
-          Inits <- guessInitials(res)
-        } else {
-          Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
-        part_m <- nls(mumax ~ E0*(1+ E_max * (((drug_concentration/EC50)**k)/(1 + ((drug_concentration/EC50)**k)))),
-                      data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
-        # E0*(1- E_max * (((drug_concentration/EC50)^k)/(1 + ((drug_concentration/EC50)^k)))
-      }
       
-      m<-append(m,list(part_m))
+      res <- results(many_fits)
+      #set up stacked variables:
+      res_1 <- subset(res,res$strain_name==levels(res$strain_name)[[1]]) #mutant
+      res_2 <- subset(res,res$strain_name==levels(res$strain_name)[[2]]) #strain1
+      mumax_stacked <- c(res_1$mumax,res_2$mumax) #y
+      conc_stacked <- c(res_1$drug_concentration,res_2$drug_concentration) #x
+      n1 <- length(res_1$drug_concentration)
+      n2 <- length(res_2$drug_concentration)
+      lcon1 <- rep(c(1,0), c(n1,n2))
+      lcon2 <- rep(c(0,1), c(n1,n2))
+      mcon1 <- lcon1
+      mcon2 <- lcon2
+      
+      Inits <- guessInitials(res) # maybe do separately for each strain
+      Inits_stacked <- c(E0_1=Inits[1],E0_2=Inits[1],E_max=Inits[2],EC50_1=Inits[3], EC50_2=Inits[3], k=Inits[4])
+      names(Inits_stacked) <- c("E0_1", "E0_2", "E_max", "EC50_1", "EC50_2", "k")
+      m <- nls(mumax_stacked ~ (E0_1*lcon1 + E0_2*lcon2) *(1+ E_max * (((conc_stacked/(EC50_1*mcon1+EC50_2*mcon2))**k)/(1 + ((conc_stacked/(EC50_1*mcon1+EC50_2*mcon2))**k)))),
+               data = res, start=Inits_stacked)
     }
+    
+    
     return(m)
   }
   
@@ -510,37 +587,92 @@ server <- function(input, output,session) {
     return(comb)
   }
   
+  # results_PD <- function(comb,many_fits,res,m) {
+  #   
+  #   columns <- c( "drug_name", "strain_name", "media_name")
+  #   
+  #   if (input$model=="exp") {
+  #     name = sliderValues_Emax()$Name
+  #   } else if (input$model=="sigmoid_Emax") {
+  #     name = c("E0","E_max","EC50","k")
+  #   } else if (input$model=="Emax") {
+  #     name = sliderValues_Emax()$Name[c(1,2,3)]
+  #   } else if (input$model=="capacity_Emax") {
+  #     name = c("E0","E_max","EC50","k")
+  #   }
+  #   
+  #   columns <- c(columns, name)
+  #   ncol <- length(columns)
+  #   d <- setNames(data.frame(matrix(ncol = ncol, nrow = 0)), columns)
+  #   
+  #   for (row in 1:nrow(comb)) {
+  #     part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+  #     part_res <- results(part_many_fits)
+  #     # columns_part_res <- colnames(part_res)
+  #     
+  #     vec1 <- list(drug_name = as.character(comb[row,2]),strain_name = as.character(comb[row,1]),media_name = as.character(comb[row,3]))
+  #     vec2 <- c(coef(m[[row]]))
+  #     vec <-c(vec1,vec2)
+  #     
+  #     #convert factor columns to character
+  #     i <- sapply(d, is.factor)
+  #     d[i] <- lapply(d[i], as.character)
+  #     d <- rbind(d, vec)
+  #   }
+  #   return(d)
+  # }
+  
   results_PD <- function(comb,many_fits,res,m) {
-    
-    columns <- c( "drug_name", "strain_name", "media_name")
-    
-    if (input$model=="exp") {
-      name = sliderValues_Emax()$Name
-    } else if (input$model=="sigmoid_Emax") {
-      name = c("E0","E_max","EC50","k")
-    } else if (input$model=="Emax") {
-      name = sliderValues_Emax()$Name[c(1,2,3)]
-    } else if (input$model=="capacity_Emax") {
-      name = c("E0","E_max","EC50","k")
-    }
-    
-    columns <- c(columns, name)
-    ncol <- length(columns)
-    d <- setNames(data.frame(matrix(ncol = ncol, nrow = 0)), columns)
-    
-    for (row in 1:nrow(comb)) {
-      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
-      part_res <- results(part_many_fits)
+    if (input$model=="capacity_Emax" & input$fitting_type=="shared") {
+      columns <- c( "drug_name", "strain_name", "media_name")
+      name = c("E0_1","E0_2","E_max","EC50_1", "EC50_2","k")
+      columns <- c(columns, name)
+      ncol <- length(columns)
+      d <- setNames(data.frame(matrix(ncol = ncol, nrow = 0)), columns)
+      res <- results(many_fits)
       # columns_part_res <- colnames(part_res)
       
-      vec1 <- list(drug_name = as.character(comb[row,2]),strain_name = as.character(comb[row,1]),media_name = as.character(comb[row,3]))
-      vec2 <- c(coef(m[[row]]))
+      vec1 <- list(drug_name = as.character(res$drug_name[[1]]),strain_name = paste(as.character(levels(res$strain_name)[[1]]),":",as.character(levels(res$strain_name)[[2]]) ),media_name = as.character(res$media_name[[1]]))
+      vec2 <- c(coef(m))
       vec <-c(vec1,vec2)
       
       #convert factor columns to character
       i <- sapply(d, is.factor)
       d[i] <- lapply(d[i], as.character)
       d <- rbind(d, vec)
+      
+    } else {
+      columns <- c( "drug_name", "strain_name", "media_name")
+      
+      if (input$model=="exp") {
+        name = sliderValues_Emax()$Name
+      } else if (input$model=="sigmoid_Emax") {
+        name = c("E0","E_max","EC50","k")
+      } else if (input$model=="Emax") {
+        name = sliderValues_Emax()$Name[c(1,2,3)]
+      } else if (input$model=="capacity_Emax") {
+        name = c("E0","E_max","EC50","k")
+      }
+      
+      columns <- c(columns, name)
+      ncol <- length(columns)
+      d <- setNames(data.frame(matrix(ncol = ncol, nrow = 0)), columns)
+      
+      for (row in 1:nrow(comb)) {
+        part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+        part_res <- results(part_many_fits)
+        # columns_part_res <- colnames(part_res)
+        
+        vec1 <- list(drug_name = as.character(comb[row,2]),strain_name = as.character(comb[row,1]),media_name = as.character(comb[row,3]))
+        vec2 <- c(coef(m[[row]]))
+        vec <-c(vec1,vec2)
+        
+        #convert factor columns to character
+        i <- sapply(d, is.factor)
+        d[i] <- lapply(d[i], as.character)
+        d <- rbind(d, vec)
+      }
+      
     }
     return(d)
   }
@@ -587,6 +719,7 @@ server <- function(input, output,session) {
     }
   })
   
+  # FIX FOR WHOLE PLATE CAPACITY SHARED
   # plot maximal growth rate estimate over AB
   output$Gconc <- renderPlot({
     m <- Fit_PD_R()
@@ -599,10 +732,10 @@ server <- function(input, output,session) {
       part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
       part_res <- results(part_many_fits)
       ordered<-order(part_res$drug_concentration)
-      
+
       plot(part_res$drug_concentration[ordered],part_res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate", main = as.character(part_res$strain_name[[1]]))
       lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2)
-      
+
       plot(part_res$drug_concentration[ordered],part_res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate",  main = as.character(part_res$strain_name[[1]]))
       lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2,log="x")
     }
@@ -613,7 +746,7 @@ server <- function(input, output,session) {
     d <- results_PD_R()
     },digits=6)
     
-  
+  # FIX FOR WHOLE PLATE CAPACITY SHARED
   output$fit_step2 <- renderPrint({
     m <- Fit_PD_R()
     comb <- combinations_R()
