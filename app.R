@@ -751,21 +751,30 @@ server <- function(input, output,session) {
   output$Gconc <- renderPlot({
     m <- Fit_PD_R()
     l_plot <- length(m)
+    many_fits <- Fit_Growthrate_R()
+    comb <- combinations_R()
     par(mfrow = c(l_plot, 2))
     par(mar = c(4, 4, 2, 1))
-    comb <- combinations_R()
-    many_fits <- Fit_Growthrate_R()
-    for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
+    
+    if (!(input$model=="capacity_Emax" & input$fitting_type=="shared")) {
       part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
       part_res <- results(part_many_fits)
       ordered<-order(part_res$drug_concentration)
-
-      plot(part_res$drug_concentration[ordered],part_res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate", main = as.character(part_res$strain_name[[1]]))
-      lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2)
-
-      plot(part_res$drug_concentration[ordered],part_res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate",  main = as.character(part_res$strain_name[[1]]))
-      lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2,log="x")
+      
+      for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
+        part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+        part_res <- results(part_many_fits)
+        ordered<-order(part_res$drug_concentration)
+        
+        plot(part_res$drug_concentration[ordered],part_res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate", main = as.character(part_res$strain_name[[1]]))
+        lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2)
+        
+        plot(part_res$drug_concentration[ordered],part_res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate",  main = as.character(part_res$strain_name[[1]]))
+        lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2,log="x")
+      }
     }
+    
+
   })
   
 
@@ -776,11 +785,15 @@ server <- function(input, output,session) {
   # FIX FOR WHOLE PLATE CAPACITY SHARED
   output$fit_step2 <- renderPrint({
     m <- Fit_PD_R()
+    comb <- combinations_R()
     if (input$model=="capacity_Emax" & input$fitting_type=="shared") {
+      print(paste("Parameters specific for ", comb[1,1]," : E0_1 and EC50_1 " ))[[1]]
+      print(paste("Parameters specific for ", comb[2,1]," : E0_2 and EC50_2 " ))[[1]]
+      print("Shared parameters: E_max and k")[[1]]
       print(summary(m))
       
     } else {
-      comb <- combinations_R()
+      
       for (i in 1:length(m)) {
         print(paste("Drug= ",comb[i,2], " , Strain= ", comb[i,1], " Media= ", comb[i,3] ))[[1]]
         print(summary(m[[i]]))
