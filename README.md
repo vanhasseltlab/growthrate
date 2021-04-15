@@ -15,7 +15,9 @@ USER INSTRUCTIONS:
 
 - Upload a preprocessed data file in csv format to this shiny app
 
-- Select a set of strain/drug/media and measurement (raw/corrected)
+- Either choose to process all the data from the input file or select a set of strain/drug/media and measurement (raw/corrected)
+
+- It is possible to exclude time points from further analysis. For this select the fisrt time point that should be included. 
 
 - The action buttons run step 1 and step 2 separately. Restart estimation when changing input parameters. If changing step 2 methods or parameters, it is only
  necessary to rerun step 2.
@@ -30,11 +32,16 @@ USER INSTRUCTIONS:
 	
 - In step 2, the estimated maximal growth rates (mumax) ~ drug concentration is fitted. Three different model equations are available for fitting:
 	1) exponential model equation: mumax ~ a * exp(b * drug_concentration) + c
-	   Provide inital estimates for the three parameters a, b & c
+	   Parameters a, b & c
 	2) Emax model equation: mumax ~ E0 + E_max * (((drug_concentration/EC50))/(1 + ((drug_concentration/EC50))))
 	   This model requires estimates from three parameters E0, E_max and EC50 which can be automatically guessed by the shiny app.
 	3) sigmoidal Emax model equation: mumax ~ E0 + E_max * (((drug_concentration/EC50)^k)/(1 + ((drug_concentration/EC50)^k)))
 	   This model requires estimates from four parameters E0, E_max, EC50 and the Hill parameter k which can be automatically guessed by the shiny app.
+	4) capacity-limited Emax model: mumax = E0*(1- E_max * (((drug_concentration/EC50)^k)/(1 + ((drug_concentration/EC50)^k)))
+	   This model requires estimates from four parameters E0, E_max, EC50 and the Hill parameter k which can be automatically guessed by the shiny app.
+	
+- shared parameter fitting: It is possible to fit a whole plate (with one drug, two strains and one media) at once using the capacity-limited Emax model with partially shared parameters. E0 and EC50 are strain-specific, Emax and k are shared between strains. It returns values of Emax and k for both strains together and values of E0 and EC50 for each of the two strains. The individual fitting fits parameters for each strain&drug and media separately.
+	   
 
 - the results can be downloaded in csv file format using the buttons on the bottom of the side panel
 

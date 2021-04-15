@@ -750,7 +750,7 @@ server <- function(input, output,session) {
   # plot maximal growth rate estimate over AB
   output$Gconc <- renderPlot({
     m <- Fit_PD_R()
-    l_plot <- length(m)
+    l_plot <- nrow(comb)
     many_fits <- Fit_Growthrate_R()
     comb <- combinations_R()
     par(mfrow = c(l_plot, 2))
@@ -772,7 +772,23 @@ server <- function(input, output,session) {
         plot(part_res$drug_concentration[ordered],part_res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate",  main = as.character(part_res$strain_name[[1]]))
         lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2,log="x")
       }
-    }
+    } else {
+      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+      part_res <- results(part_many_fits)
+      ordered<-order(part_res$drug_concentration)
+      
+      for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
+        part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+        part_res <- results(part_many_fits)
+        ordered<-order(part_res$drug_concentration)
+        
+        plot(part_res$drug_concentration[ordered],part_res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate", main = as.character(part_res$strain_name[[1]]))
+        lines(part_res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2)
+        
+        plot(part_res$drug_concentration[ordered],part_res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate",  main = as.character(part_res$strain_name[[1]]))
+        lines(part_res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2,log="x")
+      
+    }}
     
 
   })
@@ -782,7 +798,7 @@ server <- function(input, output,session) {
     d <- results_PD_R()
     },digits=6)
     
-  # FIX FOR WHOLE PLATE CAPACITY SHARED
+  
   output$fit_step2 <- renderPrint({
     m <- Fit_PD_R()
     comb <- combinations_R()
