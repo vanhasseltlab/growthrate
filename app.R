@@ -517,7 +517,7 @@ server <- function(input, output,session) {
             Inits <- guessInitials(res)
           } else {
             Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
-          part_m <- nls(mumax ~ E0*(1+ E_max * (((drug_concentration/EC50)**k)/(1 + ((drug_concentration/EC50)**k)))),
+          part_m <- nls(mumax ~ E0*(1- E_max * (((drug_concentration/EC50)**k)/(1 + ((drug_concentration/EC50)**k)))),
                         data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
           # E0*(1- E_max * (((drug_concentration/EC50)^k)/(1 + ((drug_concentration/EC50)^k)))
         }
@@ -545,7 +545,7 @@ server <- function(input, output,session) {
       Inits <- guessInitials(res) # maybe do separately for each strain
       Inits_stacked <- c(E0_1=Inits[1],E0_2=Inits[1],E_max=Inits[2],EC50_1=Inits[3], EC50_2=Inits[3], k=Inits[4])
       names(Inits_stacked) <- c("E0_1", "E0_2", "E_max", "EC50_1", "EC50_2", "k")
-      m <- nls(mumax_stacked ~ (E0_1*lcon1 + E0_2*lcon2) *(1+ E_max * (((conc_stacked/(EC50_1*mcon1+EC50_2*mcon2))**k)/(1 + ((conc_stacked/(EC50_1*mcon1+EC50_2*mcon2))**k)))),
+      m <- nls(mumax_stacked ~ (E0_1*lcon1 + E0_2*lcon2) *(1- E_max * (((conc_stacked/(EC50_1*mcon1+EC50_2*mcon2))**k)/(1 + ((conc_stacked/(EC50_1*mcon1+EC50_2*mcon2))**k)))),
                data = res, start=Inits_stacked)
     }
     
@@ -560,7 +560,8 @@ server <- function(input, output,session) {
       # E_max guess is the difference between the last value minus E0_x
       E_max_x <- res$mumax[length(res$mumax)]-E0_x
     } else if (input$model=="capacity_Emax") {
-      E_max_x <- (res$mumax[length(res$mumax)]/E0_x)-1
+      # E_max_x <- (res$mumax[length(res$mumax)]/E0_x)-1
+      E_max_x <- 1-(res$mumax[length(res$mumax)]/E0_x)
     }
     # EC50 is the drug concentration for which half the maximal growth rate is reached
     EC50_yx <- E0_x-((E0_x-res$mumax[length(res$mumax)])/2)
@@ -625,17 +626,43 @@ server <- function(input, output,session) {
   results_PD <- function(comb,many_fits,res,m) {
     if (input$model=="capacity_Emax" & input$fitting_type=="shared") {
       columns <- c( "drug_name", "strain_name", "media_name")
-      name = c("E0_1","E0_2","E_max","EC50_1", "EC50_2","k")
+      # name = c("E0_1","E0_2","E_max","EC50_1", "EC50_2","k")
+      # columns <- c(columns, name)
+      # ncol <- length(columns)
+      # d <- setNames(data.frame(matrix(ncol = ncol, nrow = 0)), columns)
+      # # res <- results(many_fits)
+      # # columns_part_res <- colnames(part_res)
+      # 
+      # vec1 <- list(drug_name = as.character(res$drug_name[[1]]),strain_name = paste(as.character(levels(res$strain_name)[[1]]),":",as.character(levels(res$strain_name)[[2]]) ),media_name = as.character(res$media_name[[1]]))
+      # vec2 <- c(coef(m))
+      # vec <-c(vec1,vec2)
+      # #convert factor columns to character
+      # i <- sapply(d, is.factor)
+      # d[i] <- lapply(d[i], as.character)
+      # d <- rbind(d, vec)
+      
+      name = c("E0","E_max","EC50","k")
       columns <- c(columns, name)
       ncol <- length(columns)
       d <- setNames(data.frame(matrix(ncol = ncol, nrow = 0)), columns)
-      res <- results(many_fits)
+      # res <- results(many_fits)
       # columns_part_res <- colnames(part_res)
       
-      vec1 <- list(drug_name = as.character(res$drug_name[[1]]),strain_name = paste(as.character(levels(res$strain_name)[[1]]),":",as.character(levels(res$strain_name)[[2]]) ),media_name = as.character(res$media_name[[1]]))
-      vec2 <- c(coef(m))
+      # for the first strain
+      vec1 <- list(drug_name = as.character(comb[1,2]),strain_name = as.character(comb[1,1]),media_name = as.character(comb[1,3]))
+      coefs_m <- c(coef(m))
+      vec2 <- c(E0=coefs_m[[1]], E_max=coefs_m[[3]],EC50=coefs_m[[4]],k=coefs_m[[6]])
       vec <-c(vec1,vec2)
+      #convert factor columns to character
+      i <- sapply(d, is.factor)
+      d[i] <- lapply(d[i], as.character)
+      d <- rbind(d, vec)
       
+      # for the second strain
+      vec1 <- list(drug_name = as.character(comb[2,2]),strain_name = as.character(comb[2,1]),media_name = as.character(comb[2,3]))
+      coefs_m <- c(coef(m))
+      vec2 <- c(E0=coefs_m[[2]], E_max=coefs_m[[3]],EC50=coefs_m[[5]],k=coefs_m[[6]])
+      vec <-c(vec1,vec2)
       #convert factor columns to character
       i <- sapply(d, is.factor)
       d[i] <- lapply(d[i], as.character)
@@ -749,11 +776,17 @@ server <- function(input, output,session) {
   # FIX FOR WHOLE PLATE CAPACITY SHARED
   output$fit_step2 <- renderPrint({
     m <- Fit_PD_R()
-    comb <- combinations_R()
-    for (i in 1:length(m)) {
-      print(paste("Drug= ",comb[i,2], " , Strain= ", comb[i,1], " Media= ", comb[i,3] ))[[1]]
-      print(summary(m[[i]]))
+    if (input$model=="capacity_Emax" & input$fitting_type=="shared") {
+      print(summary(m))
+      
+    } else {
+      comb <- combinations_R()
+      for (i in 1:length(m)) {
+        print(paste("Drug= ",comb[i,2], " , Strain= ", comb[i,1], " Media= ", comb[i,3] ))[[1]]
+        print(summary(m[[i]]))
+      }
     }
+
   })
   
   output$downloadData_step1 <- downloadHandler(
