@@ -750,16 +750,15 @@ server <- function(input, output,session) {
   # plot maximal growth rate estimate over AB
   output$Gconc <- renderPlot({
     m <- Fit_PD_R()
-    l_plot <- nrow(comb)
     many_fits <- Fit_Growthrate_R()
     comb <- combinations_R()
-    par(mfrow = c(l_plot, 2))
-    par(mar = c(4, 4, 2, 1))
+    # l_plot <- nrow(comb)
+
     
     if (!(input$model=="capacity_Emax" & input$fitting_type=="shared")) {
-      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
-      part_res <- results(part_many_fits)
-      ordered<-order(part_res$drug_concentration)
+      l_plot <- length(m)
+      par(mfrow = c(l_plot, 2))
+      par(mar = c(4, 4, 2, 1))
       
       for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
         part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
@@ -773,9 +772,9 @@ server <- function(input, output,session) {
         lines(part_res$drug_concentration[ordered],predict(m[[row]])[ordered],lty=2,col="red",lwd=2,log="x")
       }
     } else {
-      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
-      part_res <- results(part_many_fits)
-      ordered<-order(part_res$drug_concentration)
+      l_plot <- nrow(comb)
+      par(mfrow = c(l_plot, 2))
+      par(mar = c(4, 4, 2, 1))
       
       for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
         part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
