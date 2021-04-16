@@ -361,7 +361,7 @@ server <- function(input, output,session) {
       df_subset <- df_all
     }
     df_subset$corrected_measurement <- as.numeric(as.character(df_subset$corrected_measurement))
-    df_subset <- subset(df_subset, (df_subset$time>=input$selected_time))
+    df_subset <- subset(df_subset, (df_subset$time>=as.numeric(input$selected_time)))
     return(df_subset)
   }
   
