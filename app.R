@@ -230,6 +230,7 @@ ui <- fluidPage(
                   tabPanel("Input Data", tableOutput("data")),
                   tabPanel(HTML("Step 1:<br/>Growth Rates<br/>Plots"), plotOutput("plots")),
                   tabPanel(HTML("Step 1:<br/>Growth Rates<br/>Results"), tableOutput("results")),
+                  tabPanel(HTML("Step 2:<br/>PD relation<br/>Initial parameters"), plotOutput("plot1")),
                   tabPanel(HTML("Step 2:<br/>PD relation<br/>Plots"), plotOutput("Gconc")),
                   tabPanel(HTML("Step 2:<br/>PD relation<br/>Results"), tableOutput("results_PD")),
                   tabPanel(HTML("Step 2:<br/>PD relation<br/>Fit Summary"), verbatimTextOutput("fit_step2"))
@@ -261,53 +262,6 @@ server <- function(input, output,session) {
     updateSelectInput(session, "selected_media", label = "Select a media", choices = levels(df_all$media_name))
     updateSelectInput(session, "selected_time", label = 'Exclude time points before:', choices = levels(as.factor((df_all$time))))
     
-  })
-  
-  # input values step 1 fitting
-  #Reactive expression to create data frame of step 1 input values, only updated when action button is pressed
-  sliderValues <- eventReactive(input$update_1,{
-    data.frame(
-      Name = c("Y0", "Mumax","K","h0","Alpha","Lambda"),
-      InitialEstimate = c(input$y0,
-                          input$mumax,
-                          input$K,
-                          input$h0,
-                          input$alpha,
-                          input$lambda),
-      LowerEst = c(input$y0_lower,
-                   input$mumax_lower,
-                   input$K_lower,
-                   input$h0_lower,
-                   input$alpha_lower,
-                   input$lambda_lower),
-      UpperEst = c(input$y0_upper,
-                   input$mumax_upper,
-                   input$K_upper,
-                   input$h0_upper,
-                   input$alpha_upper,
-                   input$lambda_upper),
-      stringsAsFactors = FALSE)
-  })
-  
-  # input values for step 2 exp fitting
-  sliderValues_exp <- eventReactive(input$update_2,{
-    data.frame(
-      Name = c("a", "b","c"),
-      Est_s = c(input$a,
-                input$b,
-                input$c),
-      stringsAsFactors = FALSE)
-  })
-  
-  # input values for step 2 Emax fitting
-  sliderValues_Emax <- eventReactive(input$update_2,{
-    data.frame(
-      Name = c("E0", "E_max","EC50","k"),
-      Est = c(input$E0,
-              input$E_max,
-              input$EC50,
-              input$k),
-      stringsAsFactors = FALSE)
   })
   
 #_____________________________reactive wrapper functions_(everything input or app specific goes here)___________________________________________________________________________________
@@ -375,6 +329,15 @@ server <- function(input, output,session) {
     plot_Growthrate(input, many_fits, comb)
 
   })
+  
+
+  # plot maximal growth rate estimate over AB
+  output$plot1 <- renderPlot({
+    # m <- Fit_PD_R()
+    many_fits <- Fit_Growthrate_R()
+    comb <- combinations_R()
+    plot_PD_init(input,many_fits,comb)
+  })  
   
   
   # plot maximal growth rate estimate over AB

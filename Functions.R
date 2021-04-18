@@ -1,5 +1,51 @@
 #____________________functional functions_____________________________________________________________________________________________
 
+# input values step 1 fitting
+#Reactive expression to create data frame of step 1 input values, only updated when action button is pressed
+sliderValues <- function(input) { 
+  data.frame(
+    Name = c("Y0", "Mumax","K","h0","Alpha","Lambda"),
+    InitialEstimate = c(input$y0,
+                        input$mumax,
+                        input$K,
+                        input$h0,
+                        input$alpha,
+                        input$lambda),
+    LowerEst = c(input$y0_lower,
+                 input$mumax_lower,
+                 input$K_lower,
+                 input$h0_lower,
+                 input$alpha_lower,
+                 input$lambda_lower),
+    UpperEst = c(input$y0_upper,
+                 input$mumax_upper,
+                 input$K_upper,
+                 input$h0_upper,
+                 input$alpha_upper,
+                 input$lambda_upper),
+    stringsAsFactors = FALSE)
+}
+
+# input values for step 2 exp fitting
+sliderValues_exp <- function(input) { 
+  data.frame(
+    Name = c("a", "b","c"),
+    Est_s = c(input$a,
+              input$b,
+              input$c),
+    stringsAsFactors = FALSE)
+}
+
+sliderValues_Emax <- function(input) {
+  data.frame(
+    Name = c("E0", "E_max","EC50","k"),
+    Est = c(input$E0,
+            input$E_max,
+            input$EC50,
+            input$k),
+    stringsAsFactors = FALSE)
+}
+
 getData_all <- function(f) {
   df_all <- read.csv(f, stringsAsFactors=TRUE)
   return(df_all)
@@ -44,9 +90,9 @@ Fit_Growthrate <- function(input,df) {
     }
     
     else if (input$method == "baranyi") {
-      p   <- c(y0 = sliderValues()$InitialEstimate[1], mumax = sliderValues()$InitialEstimate[2], K = sliderValues()$InitialEstimate[3], h0 = sliderValues()$InitialEstimate[4])
-      lower   <- c(y0 = sliderValues()$LowerEst[1], mumax = sliderValues()$LowerEst[2], K = sliderValues()$LowerEst[3], h0 = sliderValues()$LowerEst[4])
-      upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], h0 = sliderValues()$UpperEst[4])
+      p   <- c(y0 = sliderValues(input)$InitialEstimate[1], mumax = sliderValues(input)$InitialEstimate[2], K = sliderValues(input)$InitialEstimate[3], h0 = sliderValues(input)$InitialEstimate[4])
+      lower   <- c(y0 = sliderValues(input)$LowerEst[1], mumax = sliderValues(input)$LowerEst[2], K = sliderValues(input)$LowerEst[3], h0 = sliderValues(input)$LowerEst[4])
+      upper   <- c(y0 = sliderValues(input)$UpperEst[1], mumax = sliderValues(input)$UpperEst[2], K = sliderValues(input)$UpperEst[3], h0 = sliderValues(input)$UpperEst[4])
       
       many_fits <- all_growthmodels(
         selected_measurement ~ grow_baranyi(time, parms) | strain_name + drug_concentration + drug_name + media_name,
@@ -56,9 +102,9 @@ Fit_Growthrate <- function(input,df) {
     }
     
     else if (input$method == "huang") {
-      p   <- c(y0 = sliderValues()$InitialEstimate[1], mumax = sliderValues()$InitialEstimate[2], K = sliderValues()$InitialEstimate[3], alpha = sliderValues()$InitialEstimate[5],lambda = sliderValues()$InitialEstimate[6] )
-      lower   <- c(y0 = sliderValues()$LowerEst[1], mumax = sliderValues()$LowerEst[2], K = sliderValues()$LowerEst[3], alpha = sliderValues()$LowerEst[5],lambda = sliderValues()$LowerEst[6])
-      upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], alpha = sliderValues()$UpperEst[5],lambda = sliderValues()$UpperEst[6])
+      p   <- c(y0 = sliderValues(input)$InitialEstimate[1], mumax = sliderValues(input)$InitialEstimate[2], K = sliderValues(input)$InitialEstimate[3], alpha = sliderValues(input)$InitialEstimate[5],lambda = sliderValues(input)$InitialEstimate[6] )
+      lower   <- c(y0 = sliderValues(input)$LowerEst[1], mumax = sliderValues(input)$LowerEst[2], K = sliderValues(input)$LowerEst[3], alpha = sliderValues(input)$LowerEst[5],lambda = sliderValues(input)$LowerEst[6])
+      upper   <- c(y0 = sliderValues(input)$UpperEst[1], mumax = sliderValues(input)$UpperEst[2], K = sliderValues(input)$UpperEst[3], alpha = sliderValues(input)$UpperEst[5],lambda = sliderValues(input)$UpperEst[6])
       
       many_fits <- all_growthmodels(
         selected_measurement ~ grow_huang(time, parms) |  strain_name + drug_concentration + drug_name + media_name,
@@ -76,9 +122,9 @@ Fit_Growthrate <- function(input,df) {
     }
     
     else if (input$method == "baranyi") {
-      p   <- c(y0 = sliderValues()$InitialEstimate[1], mumax = sliderValues()$InitialEstimate[2], K = sliderValues()$InitialEstimate[3], h0 = sliderValues()$InitialEstimate[4])
-      lower   <- c(y0 = sliderValues()$LowerEst[1], mumax = sliderValues()$LowerEst[2], K = sliderValues()$LowerEst[3], h0 = sliderValues()$LowerEst[4])
-      upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], h0 = sliderValues()$UpperEst[4])
+      p   <- c(y0 = sliderValues(input)$InitialEstimate[1], mumax = sliderValues(input)$InitialEstimate[2], K = sliderValues(input)$InitialEstimate[3], h0 = sliderValues(input)$InitialEstimate[4])
+      lower   <- c(y0 = sliderValues(input)$LowerEst[1], mumax = sliderValues(input)$LowerEst[2], K = sliderValues(input)$LowerEst[3], h0 = sliderValues(input)$LowerEst[4])
+      upper   <- c(y0 = sliderValues(input)$UpperEst[1], mumax = sliderValues(input)$UpperEst[2], K = sliderValues(input)$UpperEst[3], h0 = sliderValues(input)$UpperEst[4])
       
       many_fits <- all_growthmodels(
         selected_measurement ~ grow_baranyi(time, parms) | strain_name + drug_concentration + replicate_ID + drug_name + media_name,
@@ -88,9 +134,9 @@ Fit_Growthrate <- function(input,df) {
     }
     
     else if (input$method == "huang") {
-      p   <- c(y0 = sliderValues()$InitialEstimate[1], mumax = sliderValues()$InitialEstimate[2], K = sliderValues()$InitialEstimate[3], alpha = sliderValues()$InitialEstimate[5],lambda = sliderValues()$InitialEstimate[6] )
-      lower   <- c(y0 = sliderValues()$LowerEst[1], mumax = sliderValues()$LowerEst[2], K = sliderValues()$LowerEst[3], alpha = sliderValues()$LowerEst[5],lambda = sliderValues()$LowerEst[6])
-      upper   <- c(y0 = sliderValues()$UpperEst[1], mumax = sliderValues()$UpperEst[2], K = sliderValues()$UpperEst[3], alpha = sliderValues()$UpperEst[5],lambda = sliderValues()$UpperEst[6])
+      p   <- c(y0 = sliderValues(input)$InitialEstimate[1], mumax = sliderValues(input)$InitialEstimate[2], K = sliderValues(input)$InitialEstimate[3], alpha = sliderValues(input)$InitialEstimate[5],lambda = sliderValues(input)$InitialEstimate[6] )
+      lower   <- c(y0 = sliderValues(input)$LowerEst[1], mumax = sliderValues(input)$LowerEst[2], K = sliderValues(input)$LowerEst[3], alpha = sliderValues(input)$LowerEst[5],lambda = sliderValues(input)$LowerEst[6])
+      upper   <- c(y0 = sliderValues(input)$UpperEst[1], mumax = sliderValues(input)$UpperEst[2], K = sliderValues(input)$UpperEst[3], alpha = sliderValues(input)$UpperEst[5],lambda = sliderValues(input)$UpperEst[6])
       
       many_fits <- all_growthmodels(
         selected_measurement ~ grow_huang(time, parms) | strain_name + drug_concentration + replicate_ID + drug_name + media_name,
@@ -112,13 +158,13 @@ Fit_PD <- function(input,comb, many_fits){
       
       if (input$model=="exp"){
         part_m <- nls(mumax ~ a*exp(b*drug_concentration)+c,
-                      data = res, start=c(a=sliderValues_exp()$Est[1], b= sliderValues_exp()$Est[2], c=sliderValues_exp()$Est[3]))
+                      data = res, start=c(a=sliderValues_exp(input)$Est[1], b= sliderValues_exp(input)$Est[2], c=sliderValues_exp(input)$Est[3]))
       }
       
       else if (input$model=="sigmoid_Emax") {
         if (input$guess=="yes"){
           Inits <- guessInitials(input,res)
-        } else {Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+        } else {Inits <-c(E0=sliderValues_Emax(input)$Est[1],E_max=sliderValues_Emax(input)$Est[2], EC50=sliderValues_Emax(input)$Est[3], k=sliderValues_Emax(input)$Est[4])}
         part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50)**k)/(1+((drug_concentration/EC50)**k))),
                       data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
       }
@@ -127,7 +173,7 @@ Fit_PD <- function(input,comb, many_fits){
         if (input$guess=="yes"){
           Inits <- guessInitials(input,res)
         } else {
-          Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+          Inits <-c(E0=sliderValues_Emax(input)$Est[1],E_max=sliderValues_Emax(input)$Est[2], EC50=sliderValues_Emax(input)$Est[3], k=sliderValues_Emax(input)$Est[4])}
         part_m <- nls(mumax ~ E0 + E_max *(((drug_concentration/EC50))/(1+((drug_concentration/EC50)))),
                       data = res, start=c(Inits[1], Inits[2], Inits[3]))
       }
@@ -136,7 +182,7 @@ Fit_PD <- function(input,comb, many_fits){
         if (input$guess=="yes"){
           Inits <- guessInitials(input,res)
         } else {
-          Inits <-c(E0=sliderValues_Emax()$Est[1],E_max=sliderValues_Emax()$Est[2], EC50=sliderValues_Emax()$Est[3], k=sliderValues_Emax()$Est[4])}
+          Inits <-c(E0=sliderValues_Emax(input)$Est[1],E_max=sliderValues_Emax(input)$Est[2], EC50=sliderValues_Emax(input)$Est[3], k=sliderValues_Emax(input)$Est[4])}
         part_m <- nls(mumax ~ E0*(1- E_max * (((drug_concentration/EC50)**k)/(1 + ((drug_concentration/EC50)**k)))),
                       data = res, start=c(Inits[1], Inits[2], Inits[3], Inits[4]))
       }
@@ -238,11 +284,11 @@ results_PD <- function(input,comb,many_fits,res,m) {
     columns <- c( "drug_name", "strain_name", "media_name")
     
     if (input$model=="exp") {
-      name = sliderValues_Emax()$Name
+      name = sliderValues_Emax(input)$Name
     } else if (input$model=="sigmoid_Emax") {
       name = c("E0","E_max","EC50","k")
     } else if (input$model=="Emax") {
-      name = sliderValues_Emax()$Name[c(1,2,3)]
+      name = sliderValues_Emax(input)$Name[c(1,2,3)]
     } else if (input$model=="capacity_Emax") {
       name = c("E0","E_max","EC50","k")
     }
@@ -324,6 +370,50 @@ plot_PD <- function(input,many_fits,m,comb) {
       lines(part_res$drug_concentration[ordered],predict(m)[ordered],lty=2,col="red",lwd=2,log="x")
       
     }}
+}
+
+
+plot_PD_init <- function(input,many_fits,comb) {
+  
+  # if (!(input$model=="capacity_Emax" & input$fitting_type=="shared")) {
+    l_plot <- nrow(comb)
+    par(mfrow = c(l_plot, 2))
+    par(mar = c(4, 4, 2, 1))
+    
+    for(row in 1:nrow(comb)) { # for every combinations of strain/drug/media
+      part_many_fits <- subset(many_fits, as.character(results(many_fits)$strain_name)==as.character(comb[row,1]) & as.character(results(many_fits)$drug_name)==as.character(comb[row,2]) & as.character(results(many_fits)$media_name)==as.character(comb[row,3]))
+      res <- results(part_many_fits)
+      ordered<-order(res$drug_concentration)
+
+      
+      if (input$guess=="yes" & input$model!="exp") {
+        Inits <- guessInitials(input,res)
+      } else if (input$guess=="no" & input$model!="exp") {
+        Inits <-c(E0=sliderValues_Emax(input)$Est[1],E_max=sliderValues_Emax(input)$Est[2], EC50=sliderValues_Emax(input)$Est[3], k=sliderValues_Emax(input)$Est[4])
+      } else if (input$guess=="no" & input$model!="exp") {
+        Inits <-c(E0=sliderValues_Emax(input)$Est[1],E_max=sliderValues_Emax(input)$Est[2], EC50=sliderValues_Emax(input)$Est[3], k=sliderValues_Emax(input)$Est[4])
+      } else if (input$model=="exp") {
+        Inits <- c(a=sliderValues_exp(input)$Est[1], b= sliderValues_exp(input)$Est[2], c=sliderValues_exp(input)$Est[3])
+      }
+      
+      
+      if (input$model=="Emax") {
+        y_init <- Inits["E0"] + Inits["E_max"] *(((res$drug_concentration/Inits["EC50"]))/(1+((res$drug_concentration/Inits["EC50"]))))
+      } else if (input$model=="sigmoid_Emax") {
+        y_init <- Inits["E0"] + Inits["E_max"] *(((res$drug_concentration/Inits["EC50"])**Inits["k"])/(1+((res$drug_concentration/Inits["EC50"])**Inits["k"])))
+      } else if (input$model=="capacity_Emax") {
+        y_init <- Inits["E0"]*(1- Inits["E_max"] * (((res$drug_concentration/Inits["EC50"])**Inits["k"])/(1 + ((res$drug_concentration/Inits["EC50"])**Inits["k"]))))
+      } else if (input$model=="exp") {
+        y_init <- Inits["a"]*exp(Inits["b"]*res$drug_concentration)+Inits["c"]
+      }
+      
+      plot(res$drug_concentration[ordered],res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate", main = as.character(res$strain_name[[1]]))
+      lines(res$drug_concentration[ordered],y_init,lty=2,col="red",lwd=2)
+      
+      plot(res$drug_concentration[ordered],res$mumax[ordered], log="x",xlab="Log-scale drug concentration",ylab="Est. maximal growth rate",  main = as.character(res$strain_name[[1]]))
+      lines(res$drug_concentration[ordered],y_init,lty=2,col="red",lwd=2,log="x")
+    }
+  # } 
 }
 
 Print_PD <- function(input, comb, m) {
