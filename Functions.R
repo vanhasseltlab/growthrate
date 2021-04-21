@@ -62,10 +62,10 @@ getData_subset <- function(input,df_all) {
   df_subset$corrected_measurement <- as.numeric(as.character(df_subset$corrected_measurement))
   df_subset <- subset(df_subset, (df_subset$time>=as.numeric(input$selected_time)))
   
-  if (any(df_subset$corrected_measurement<=0)){
-    added_value <- round(abs(min(df_subset$corrected_measurement)), digits=4) 
-    df_subset$corrected_measurement <- df_subset$corrected_measurement + added_value
-  }
+  # if (any(df_subset$corrected_measurement<=0)){
+  #   added_value <- round(abs(min(df_subset$corrected_measurement)), digits=4) 
+  #   df_subset$corrected_measurement <- df_subset$corrected_measurement + added_value
+  # }
   
   # if (any(df_subset$raw_measurement<=0)){
   #   added_value <- round(abs(min(df_subset$raw_measurement)), digits=4) 
@@ -232,7 +232,7 @@ guessInitials <- function(input,res) {
   EC50_yx_dif <- abs(res$mumax-EC50_yx)
   which_x <- which(EC50_yx_dif==min(EC50_yx_dif))
   half_mumax <- res$mumax[which_x]
-  EC50_x <-  res$drug_concentration[which_x]
+  EC50_x <-  mean(res$drug_concentration[which_x])
   # for k the default slider value is used
   # k_x<-sliderValues_Emax()$Est[4]
   k_x<-5
