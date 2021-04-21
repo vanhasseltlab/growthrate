@@ -210,7 +210,7 @@ ui <- fluidPage(
             ),
             column(3,
                    numericInput("k", "Hill parameter: k",
-                                min = -5, max = 5,
+                                min = -5, max = 10,
                                 value = 5, step = 0.1))
           )
           
