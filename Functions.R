@@ -398,13 +398,13 @@ plot_PD_init <- function(input,many_fits,comb) {
       
       
       if (input$model=="Emax") {
-        y_init <- Inits["E0"] + Inits["E_max"] *(((res$drug_concentration/Inits["EC50"]))/(1+((res$drug_concentration/Inits["EC50"]))))
+        y_init <- Inits["E0"] + Inits["E_max"] *(((res$drug_concentration[ordered]/Inits["EC50"]))/(1+((res$drug_concentration[ordered]/Inits["EC50"]))))
       } else if (input$model=="sigmoid_Emax") {
-        y_init <- Inits["E0"] + Inits["E_max"] *(((res$drug_concentration/Inits["EC50"])**Inits["k"])/(1+((res$drug_concentration/Inits["EC50"])**Inits["k"])))
+        y_init <- Inits["E0"] + Inits["E_max"] *(((res$drug_concentration[ordered]/Inits["EC50"])**Inits["k"])/(1+((res$drug_concentration[ordered]/Inits["EC50"])**Inits["k"])))
       } else if (input$model=="capacity_Emax") {
-        y_init <- Inits["E0"]*(1- Inits["E_max"] * (((res$drug_concentration/Inits["EC50"])**Inits["k"])/(1 + ((res$drug_concentration/Inits["EC50"])**Inits["k"]))))
+        y_init <- Inits["E0"]*(1- Inits["E_max"] * (((res$drug_concentration[ordered]/Inits["EC50"])**Inits["k"])/(1 + ((res$drug_concentration[ordered]/Inits["EC50"])**Inits["k"]))))
       } else if (input$model=="exp") {
-        y_init <- Inits["a"]*exp(Inits["b"]*res$drug_concentration)+Inits["c"]
+        y_init <- Inits["a"]*exp(Inits["b"]*res$drug_concentration[ordered])+Inits["c"]
       }
       
       plot(res$drug_concentration[ordered],res$mumax[ordered],xlab="drug concentration",ylab="Est. maximal growth rate", main = as.character(res$strain_name[[1]]))
