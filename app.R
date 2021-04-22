@@ -1,8 +1,26 @@
+# Maximal growth rate estimator - App version
+# Author: Catharina Meyer, Quantitative Pharmacology
+# Contact: c.meyer@lacdr.leidenuniv.nl
+# Description: This shiny app fits time kill data in two steps. In step 1, 
+#              the growth curves over time are fitted and the maximal growth rates 
+#              are estimated. In step 2, the PD relation (maximal growth rates over 
+#              drug concentration) is fitted.
+# Date of last change: 22.04.2021
+
+#--------------------------------------------------------------------------------------------------------------------------------------
+
+
+# load R packages
 library(shiny)
 library(lattice)
 library(deSolve)
-library("growthrates")
+library("growthrates") # functions from this package are used for the main fitting in step 1
 
+#--------------------------------------------------------------------------------------------------------------------------------------
+# ------------------- User interface object--------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------------------------------
+
+# This object defines the user input, side panels and output panels and is only necessary when run as app
 ui <- fluidPage(
   
   titlePanel("Maximal growth rate estimator"),
@@ -31,7 +49,7 @@ ui <- fluidPage(
       
       helpText("This shiny app fits time kill data in two steps. In step 1, the growth curves over time are fitted and the maximal growth rates are estimated. In step 2, the relation of maximal growth rates over drug concentration is fitted."),
       
-      # Input: actionButton() to defer the rendering of output ----
+      # Input: actionButton() to defer the rendering of output
       # until the user explicitly clicks the button (rather than
       # doing it immediately when inputs change).
       fluidRow(
@@ -43,7 +61,6 @@ ui <- fluidPage(
       helpText("Note: Restart estimation when changing input parameters. If changing step 2 methods or parameters, it is only necessary to rerun step 2."),
       
       radioButtons(inputId = "pool", label="Compute growth rate", choices = c("per replicate","pooled"),selected="pooled"),
-      #helpText("Note: Step 2 is only possible when data with different drug concentrations is not pooled together!"),
 
       # Input: Selector for choosing method
       selectInput(inputId = "method",
@@ -51,8 +68,7 @@ ui <- fluidPage(
                   choices = c("smoothing", "baranyi", "huang")),
       
       # Numeric input of parameters step 1
-      # radioButtons(inputId = "guess1", label="Guess initials step 1:", choices = c("yes","no"),selected="yes"),
-      
+      # show these parameters only when choosing a parametric method (huang or baranyi)
       conditionalPanel(
         condition = "input.method != 'smoothing'",
         radioButtons(inputId = "customrange", label="Customize lower and upper values:", choices = c("yes","no"),selected="no"),
@@ -71,7 +87,7 @@ ui <- fluidPage(
                               min = 0, max = 5,
                               value = 0.2, step = 0.01))
           ),
-        # #this doesn't work
+        # only show range of initial parameters if the customrange is set to yes
         conditionalPanel(
           condition = "input.customrange == 'yes'",
           fluidRow(
@@ -104,7 +120,7 @@ ui <- fluidPage(
                                 value = 2, step = 0.01)))
           )
         ),
-      
+      # if the method baranyi is chosen, additionally show these parameters and the ranges
       conditionalPanel(
         condition = "input.method == 'baranyi'",
         fluidRow(
@@ -125,6 +141,8 @@ ui <- fluidPage(
                               value = 10, step = 0.1)))
         )
       ),
+      # if the method huang is chosen, additionally show these parameters and the ranges
+      
       conditionalPanel(
         condition = "input.method == 'huang'",
         fluidRow(
@@ -154,15 +172,16 @@ ui <- fluidPage(
                               value = 4, step = 0.1)))
         )
       ),
-
+      
+      # Select input for method in step 2
       radioButtons(inputId = "model", label="Choose a model for step 2:", choices = c("exp","Emax","sigmoid_Emax", "capacity_Emax"), selected="sigmoid_Emax"),
       
+      # for the capacity_Emax model, a shared fitting option is implemented
       conditionalPanel(
         condition = "input.model == 'capacity_Emax'",
         radioButtons(inputId = "fitting_type", label="Choose fitting type for parameters:", choices = c("individual","shared"), selected = "individual"),
-        
         ),
-      
+      # Show input for parameters of exponential model if this is selected
       conditionalPanel(
         condition = "input.model == 'exp'",
         helpText("Exponential model equation: mumax[drug_concentration] = a*exp(b*drug_concentration)+c"),
@@ -180,15 +199,15 @@ ui <- fluidPage(
                               min = -5, max = 5,
                               value = 0.6, step = 0.1)
           ))),
-      
+      # an automated guess of the inital parameters is available in step 2 for the variations of the Emax model
       conditionalPanel(
         condition = ("(input.model == 'Emax') | (input.model == 'sigmoid_Emax') | ((input.model == 'capacity_Emax') & (input.fitting_type=='individual'))"),
         radioButtons(inputId = "guess", label="Guess step 2 parameters:", choices = c("yes","no")),
+        # show manual input option for inital parameters
         conditionalPanel(
           condition = "input.guess == 'no'",
           # Numeric input of parameters step 2
           helpText("Choose parameter estimates for step 2: "),
-          # helpText("(Sigmoid) E_max model equation: mumax[drug_concentration] = E0 + E_max *(((drug_concentration/EC50)**k)/(1+((drug_concentration/EC50)**k)))"),
           helpText("(Sigmoid) E_max model formula: mumax ~ E0 + E_max * (((drug_concentration/EC50)^k)/(1 + ((drug_concentration/EC50)^k)))"),
           helpText("Note: for Emax, k is fixed to 1"),
         
@@ -243,18 +262,15 @@ ui <- fluidPage(
 #--------------------------------------------------------------------------------------------------------------------------------------
 #Server function ----------------------------------------------------------------------------------------------------------------------
 #--------------------------------------------------------------------------------------------------------------------------------------
-server <- function(input, output,session) {
+# This function creates the output
+
+server <- function(input, output, session) {
   
-  source("Functions.R")
-  
-  # REMOVE THIS ?
-  Results <- function() {
-    res <- results(Fit_Growthrate_R())
-    return(res)
-  }
+  source("Functions.R") # this imports the functions defined in the script Functions.R
 
 #____________________event and input functions_____________________________________________________________________________________________
   
+  # creates the input selection options from the input file
   observeEvent(input$file1, {
     df_all <- getData_all_R()
     updateSelectInput(session, "selected_strain", label = "Select a strain", choices = levels(df_all$strain_name))
@@ -265,50 +281,60 @@ server <- function(input, output,session) {
   })
   
 #_____________________________reactive wrapper functions_(everything input or app specific goes here)___________________________________________________________________________________
+  # all the functions with "_R" are reactive functions to wrap the imported functions. 
+  # This makes sure that the wrapped functions are only run when certain inputs are changed or when the action buttons are pressed.
   
+  # reads in all the data from the input file
   getData_all_R <- reactive({
     req(input$file1)
     df_all <- getData_all(input$file1$datapath)
     return(df_all)
   })
-  
+  # selects a subset of the data according to user input
   getData_subset_R <- reactive({
     df_all <- getData_all_R()
     df_subset <- getData_subset(input, df_all)
   return(df_subset)
     })
 
-  # step 1 fitting/ not modularized yet
+  # fits the growthcurves to determine maximal growth rates (step 1)
   Fit_Growthrate_R <- eventReactive(input$update_1,{
     df <- getData_subset_R()
     many_fits <- Fit_Growthrate(input, df)
     return(many_fits)
   })
+  
+  # created all combintaions of drug/strain/media that is present in the data subset
+  combinations_R <- reactive({
+    df <- getData_subset_R()
+    comb <- combinations(input, df)
+    return(comb)
+  }) 
 
-  #step 2 fitting
+  # fits the PD relation (maximal growth rates over drug concentration) for every combination of drug/strain/media individually or with shared parameters
   Fit_PD_R <- eventReactive(input$update_2,{
     comb <- combinations_R()
-    many_fits <- Fit_Growthrate_R() # IS many_fits necessary here? - rewrite Fit_PD()
-    m <- Fit_PD(input, comb,many_fits)
+    res <- Results()
+    m <- Fit_PD(input, comb, res)
     return(m)
   })
 
-  combinations_R <- reactive({
-    df <- getData_subset_R() # why subset
-    comb <- combinations(input, df)
-    return(comb)
-  })  
-  
+  # retrieves results from the PD fitting (step 2) in the correct data format
   results_PD_R <- reactive({
     comb <- combinations_R()
     many_fits <- Fit_Growthrate_R()
-    res <- results(many_fits) # replace with Results()???
+    # res <- results(many_fits) # replace with Results()???
+    res <- Results()
     m <- Fit_PD_R()
-    d <- results_PD(input, comb,many_fits,res,m)
+    d <- results_PD(input, comb, res, m)
     return(d)
   })
   
-  
+  # retrieves results from the growthcurves fitting (step 1)
+  Results <- function() {
+    res <- results(Fit_Growthrate_R())
+    return(res)
+  }
 
 #----Output--------------------------------------------------------------------------------------------------------------
   
@@ -318,48 +344,47 @@ server <- function(input, output,session) {
     return(df_all)
     },digits=6)
   
-  # show fitting results in table
+  # show fitting results (step 1) in table
   output$results <- renderTable(Results(), digits=6)
  
   # plot with fitting
   output$plots <- renderPlot({
-    #Plot results
     many_fits <- Fit_Growthrate_R()
     comb <- combinations_R()
     plot_Growthrate(input, many_fits, comb)
 
   })
   
-
-  # plot maximal growth rate estimate over AB
+  # plot maximal growth rate estimates over drug concentration 
+  # the model fit using the initial parameters before the fitting is shown in red
   output$plot1 <- renderPlot({
-    # m <- Fit_PD_R()
-    many_fits <- Fit_Growthrate_R()
+    res <- Results()
     comb <- combinations_R()
-    plot_PD_init(input,many_fits,comb)
+    plot_PD_init(input, res, comb)
   })  
   
   
   # plot maximal growth rate estimate over AB
   output$Gconc <- renderPlot({
+    res <- Results()
     m <- Fit_PD_R()
-    many_fits <- Fit_Growthrate_R()
     comb <- combinations_R()
-    plot_PD(input,many_fits,m,comb)
+    plot_PD(input, res, m, comb)
   })
   
-
+  # show fitting results (step 2) in table
   output$results_PD <- renderTable({
     d <- results_PD_R()
     },digits=6)
     
-  
+  # print summary of fitting in step 2
   output$fit_step2 <- renderPrint({
     m <- Fit_PD_R()
     comb <- combinations_R()
     Print_PD(input, comb, m)
   })
   
+  # defines output that can be downloaded
   output$downloadData_step1 <- downloadHandler(
     filename = function() {
       paste("Step1_results-", Sys.Date(), ".csv", sep="")
@@ -369,6 +394,7 @@ server <- function(input, output,session) {
     }
   )
   
+  # defines output that can be downloaded
   output$downloadData_step2 <- downloadHandler(
     filename = function() {
       paste("Step2_results-", Sys.Date(), ".csv", sep="")
@@ -379,5 +405,5 @@ server <- function(input, output,session) {
   )
 }
 
-# Create Shiny app ----
+# Create Shiny app
 shinyApp(ui, server)
