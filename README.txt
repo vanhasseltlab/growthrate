@@ -51,8 +51,6 @@ For the Emax models, the app is able to generate initial parameters when using t
 There is no automated guess available for the baranyi and huang model. You can try to find inital values when first running the smoothing method which does not require inital estimates.
 
 
-Negative measurement values: In case there are negative values in the corrected measurements, the app adds a value to all the corrected measurement data. This only affects the y axis and does not affect the estimates of the growthrate (mumax). However it is important to keep this in mind when interpreting the plots in step 1. The additive value is the absolute value A of the lowest negative entry rounded up to four digits. A= round(abs(min(corrected_measurements)), digits=4)
-
-
+Negative measurement values: The app cannot process negative measurement values.  
 	
 
