@@ -7,7 +7,8 @@
 #              drug concentration) is fitted.
 # Date of last change: 22.04.2021
 #----------------------------------------------------------------------------------------------------------
-
+library("deSolve")
+library("lattice")
 library("growthrates") # this is the package which does the main fitting in step 1
 
 # set your working directory, for example choose the folder where this script is located
@@ -16,7 +17,7 @@ source("App/growthrate/Functions.R")
 
 # set path to data file
 # Example
-f<-"data/ProcessingOutput-new/Preprocessed_defaultFolder.csv"
+f <-"data/ProcessingOutput-new/Preprocessed_defaultFolder.csv"
 
 #-----------------------User input-------------------------------------------------------------------------
 
