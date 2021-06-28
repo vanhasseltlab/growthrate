@@ -1,7 +1,7 @@
 # growthrate
 
 Shiny app- Maximal growth rate estimator 
-Link: http://132.229.100.197:2222/growthrate/
+Link: https://vanhasseltlab.lacdr.leidenuniv.nl/growthrate/
 
 Author: Catharina Meyer
 Contact: c.meyer@lacdr.leidenuniv.nl
